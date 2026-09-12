@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>DRII · Room review</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family:
+          Inter,
+          Segoe UI,
+          sans-serif;
+        color: #ecf7f4;
+        background: #0a171a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      main {
+        max-width: 1200px;
+        margin: auto;
+        padding: 40px 28px;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 28px;
+        border-bottom: 1px solid #264046;
+      }
+      .brand {
+        font-weight: 800;
+        letter-spacing: 0.2em;
+        font-size: 22px;
+      }
+      .pill {
+        border: 1px solid #39565c;
+        padding: 8px 14px;
+        border-radius: 30px;
+        color: #b7d3d1;
+        font-size: 13px;
+      }
+      h1 {
+        font-size: clamp(30px, 4vw, 48px);
+        letter-spacing: -0.035em;
+        margin: 36px 0 12px;
+      }
+      h2 {
+        font-size: 20px;
+        margin: 0 0 18px;
+      }
+      .intro {
+        max-width: 740px;
+        line-height: 1.7;
+        color: #aac5c6;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 22px;
+        margin-top: 28px;
+      }
+      .card {
+        background: #112428;
+        border: 1px solid #29444b;
+        border-radius: 18px;
+        padding: 26px;
+      }
+      .eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.15em;
+        color: #79c8b5;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+      }
+      .controls {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      button {
+        border: 1px solid #45636a;
+        border-radius: 9px;
+        padding: 12px 16px;
+        background: #1b353b;
+        color: #ecf7f4;
+        font: inherit;
+        cursor: pointer;
+      }
+      button.primary {
+        background: #adebcf;
+        color: #122a29;
+        border-color: #adebcf;
+        font-weight: 650;
+      }
+      button.danger {
+        background: #412b30;
+        border-color: #6c4249;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      button:focus-visible,
+      textarea:focus-visible {
+        outline: 3px solid #adebcf;
+        outline-offset: 3px;
+      }
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 20px 0;
+      }
+      .dot {
+        width: 9px;
+        height: 9px;
+        background: #6c878a;
+        border-radius: 50%;
+      }
+      .dot.live {
+        background: #f37e78;
+        box-shadow: 0 0 0 5px #f37e781a;
+      }
+      .muted {
+        color: #a4bfc1;
+        font-size: 13px;
+        line-height: 1.65;
+      }
+      .stats {
+        display: flex;
+        gap: 25px;
+        padding: 18px 0;
+        border-top: 1px solid #29444b;
+      }
+      .stats strong {
+        display: block;
+        color: #dbede9;
+        font-size: 20px;
+        margin-bottom: 4px;
+      }
+      textarea {
+        width: 100%;
+        height: 120px;
+        border: 1px solid #39575d;
+        background: #0b1c20;
+        border-radius: 10px;
+        color: #e5f6ef;
+        padding: 14px;
+        font: inherit;
+        line-height: 1.5;
+        resize: vertical;
+      }
+      label {
+        display: block;
+        margin: 24px 0 10px;
+        font-size: 14px;
+      }
+      .transcript {
+        max-height: 360px;
+        overflow: auto;
+        white-space: pre-wrap;
+        line-height: 1.65;
+        font-size: 14px;
+      }
+      .empty {
+        padding: 45px 14px;
+        text-align: center;
+        color: #9bb6b9;
+        border: 1px dashed #355259;
+        border-radius: 12px;
+      }
+      .result {
+        white-space: pre-wrap;
+        line-height: 1.7;
+        font-size: 14px;
+      }
+      .error {
+        color: #ffb9a7;
+        min-height: 24px;
+        margin: 14px 0;
+        font-size: 14px;
+      }
+      .wide {
+        grid-column: 1/-1;
+      }
+      footer {
+        color: #789da2;
+        margin: 25px 0;
+        font-size: 12px;
+        line-height: 1.7;
+      }
+      code {
+        overflow-wrap: anywhere;
+        color: #b5e8d5;
+      }
+      summary {
+        cursor: pointer;
+        color: #c4e8df;
+        margin-top: 16px;
+      }
+      details pre {
+        white-space: pre-wrap;
+        font:
+          13px/1.6 Segoe UI,
+          sans-serif;
+      }
+      @media (max-width: 800px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        main {
+          padding: 24px 18px;
+        }
+        .card {
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="brand">
+          DRII
+          <span
+            style="
+              font-weight: 400;
+              color: #81aaa8;
+              font-size: 13px;
+              letter-spacing: 0;
+            "
+            >/ room review</span
+          >
+        </div>
+        <span class="pill">Human approval stays in Slack</span>
+      </header>
+      <h1>Hear the discussion.<br />Check the decision.</h1>
+      <p class="intro">
+        Capture a meeting with explicit start and stop controls. DRII reviews
+        finalized transcript segments against company evidence and surfaces
+        questions worth asking.
+      </p>
+      <div class="grid">
+        <section class="card">
+          <div class="eyebrow">01 / Capture</div>
+          <h2>You control the microphone</h2>
+          <p class="muted">
+            When you start, audio is sent in short chunks to the configured
+            OpenAI transcription service. Confirm that participants are ready.
+            Speaker identities stay unknown until corrected. No spoken output is
+            played.
+          </p>
+          <div class="controls">
+            <button id="start" class="primary">Start microphone</button
+            ><button id="stop" class="danger" disabled>Stop capture</button
+            ><button id="new">New session</button>
+          </div>
+          <div class="status" role="status" aria-live="polite">
+            <span id="dot" class="dot"></span
+            ><span id="status">Microphone off</span>
+          </div>
+          <div class="stats">
+            <div>
+              <strong id="count">0</strong
+              ><span class="muted">finalized segments</span>
+            </div>
+            <div>
+              <strong id="latency">—</strong
+              ><span class="muted" id="latency-label">last review latency</span>
+            </div>
+          </div>
+          <label for="manual">Transcript fallback</label
+          ><textarea
+            id="manual"
+            placeholder="Paste a completed thought or a prepared transcript…"
+          ></textarea
+          ><button id="append" style="margin-top: 10px">
+            Add finalized text
+          </button>
+          <p id="error" class="error" role="alert"></p>
+          <button id="retry-audio" hidden>Retry buffered audio</button>
+          <p class="muted">
+            Only finalized chunks enter a review. Reviews are limited to one per
+            30 seconds. Chunked capture is buffered, not continuous realtime
+            inference.
+          </p>
+        </section>
+        <section class="card">
+          <div class="eyebrow">02 / Transcript</div>
+          <h2>Inspect what was captured</h2>
+          <div id="transcript" class="transcript empty">
+            Finalized transcript segments will appear here.
+          </div>
+          <p class="muted" id="session"></p>
+        </section>
+        <section class="card wide">
+          <div class="eyebrow">03 / Evidence review</div>
+          <div
+            class="controls"
+            style="justify-content: space-between; align-items: center"
+          >
+            <h2>Potential objections and conditions</h2>
+            <div class="controls">
+              <button id="review" class="primary">
+                Review current discussion</button
+              ><button id="mute">Mute suggestions</button
+              ><button id="dismiss">Dismiss this suggestion</button>
+            </div>
+          </div>
+          <div id="result" class="result empty">
+            A sourced review will appear after there is enough discussion to
+            identify a decision.
+          </div>
+          <details id="evidence" hidden>
+            <summary>Inspect exact evidence and provenance</summary>
+            <pre id="sources"></pre>
+          </details>
+          <p id="decision" class="muted"></p>
+        </section>
+      </div>
+      <footer>
+        Recordings and pasted transcripts are inputs, never approval.
+        Source-backed findings may still be uncertain. Inspect the evidence and
+        let the configured owner make the final choice. If capture fails, stop
+        the microphone and use the transcript fallback.
+      </footer>
+    </main>
+    <script>
+      const token = '__ROOM_TOKEN__';
+      const $ = (id) => document.getElementById(id);
+      let room = null,
+        stream = null,
+        recorder = null,
+        capturing = false,
+        queue = Promise.resolve(),
+        started = 0,
+        chunkTimer = null,
+        reviewing = false,
+        lastTextEnd = 0,
+        queuedAudio = 0;
+      const pendingAudio = [];
+      const setStatus = (text) => {
+        $('status').textContent = text;
+        $('dot').classList.toggle('live', capturing);
+      };
+      const error = (e) => {
+        $('error').textContent = e.message || String(e);
+      };
+      async function api(path, value) {
+        let response;
+        const attempts = ['start', 'mute', 'transcribe'].includes(path) ? 1 : 3;
+        for (let attempt = 0; attempt < attempts; attempt++) {
+          try {
+            response = await fetch('/api/' + path, {
+              method: 'POST',
+              headers: {
+                'X-Room-Token': token,
+                'Content-Type':
+                  value instanceof Blob ? 'audio/webm' : 'application/json',
+              },
+              body: value instanceof Blob ? value : JSON.stringify(value || {}),
+            });
+            break;
+          } catch (failure) {
+            if (attempt === attempts - 1) throw failure;
+            setStatus('Connection interrupted; retrying this request…');
+            await new Promise((resolve) =>
+              setTimeout(resolve, 1000 * (attempt + 1)),
+            );
+          }
+        }
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Request failed');
+        return data;
+      }
+      function render() {
+        if (!room) return;
+        $('count').textContent = room.segments.length;
+        $('session').textContent =
+          'Session ' + room.id + (room.active ? ' · active' : ' · stopped');
+        $('transcript').textContent =
+          room.segments
+            .map((s) => '[' + Math.round(s.startMs / 1000) + 's] ' + s.text)
+            .join('\n\n') || 'No finalized text yet.';
+        $('transcript').classList.toggle('empty', !room.segments.length);
+        $('mute').textContent = room.muted
+          ? 'Unmute suggestions'
+          : 'Mute suggestions';
+        localStorage.setItem('drii-room', room.id);
+      }
+      async function ensureRoom() {
+        if (!room || !room.active) {
+          room = await api('start');
+          render();
+        }
+        return room;
+      }
+      async function append(text, start, end, id = crypto.randomUUID()) {
+        if (!text.trim()) return;
+        room = await api('segment', {
+          id: room.id,
+          segment: {
+            id,
+            text: text.trim(),
+            startMs: Math.max(0, Math.round(start)),
+            endMs: Math.max(1, Math.round(end), Math.round(start) + 1),
+            finalized: true,
+          },
+        });
+        lastTextEnd = end;
+        render();
+      }
+      function pauseAudio(message) {
+        capturing = false;
+        clearTimeout(chunkTimer);
+        if (recorder?.state === 'recording') recorder.stop();
+        stream?.getTracks().forEach((t) => t.stop());
+        stream = null;
+        $('start').disabled = queuedAudio > 0 || pendingAudio.length > 0;
+        $('stop').disabled = false;
+        setStatus(message);
+      }
+      async function submitAudio(item) {
+        if (item.blob.size > 2000000)
+          throw new Error('Audio chunk exceeds 2 MB.');
+        if (item.text === null)
+          item.text = (await api('transcribe', item.blob)).text;
+        await append(item.text, item.from, item.to, item.id);
+      }
+      function retainAudio(item, failure) {
+        pendingAudio.push(item);
+        $('retry-audio').hidden = false;
+        pauseAudio(
+          'Microphone off. Buffered audio needs a retry. Keep this page open.',
+        );
+        error(failure);
+      }
+      function captureChunk() {
+        if (!capturing) return;
+        const chunks = [];
+        const from = performance.now() - started;
+        recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        recorder.ondataavailable = (e) => {
+          if (e.data.size) chunks.push(e.data);
+        };
+        recorder.onerror = () => {
+          pauseAudio('Microphone off - recording error.');
+          error(
+            new Error(
+              'Microphone encoding failed. Stop and use the transcript fallback.',
+            ),
+          );
+        };
+        recorder.onstop = () => {
+          const to = performance.now() - started;
+          const blob = new Blob(chunks, { type: 'audio/webm' });
+          const item = {
+            blob,
+            from,
+            to,
+            id: crypto.randomUUID(),
+            text: null,
+            finalizedAt: performance.now(),
+          };
+          queuedAudio++;
+          queue = queue
+            .then(async () => {
+              if (pendingAudio.length) {
+                retainAudio(
+                  item,
+                  new Error('Waiting for the previous buffered chunk.'),
+                );
+                return;
+              }
+              setStatus(
+                capturing
+                  ? 'Capturing · transcribing finalized audio'
+                  : 'Transcribing final audio…',
+              );
+              await submitAudio(item);
+              if (capturing) void review(true, item.finalizedAt);
+            })
+            .catch((failure) => retainAudio(item, failure))
+            .finally(() => {
+              queuedAudio--;
+              if (!capturing)
+                $('start').disabled =
+                  queuedAudio > 0 || pendingAudio.length > 0;
+            });
+          if (
+            capturing &&
+            queuedAudio < 3 &&
+            room.segments.length + queuedAudio < 80 &&
+            to < 15 * 60 * 1000
+          )
+            captureChunk();
+          else if (capturing) {
+            pauseAudio(
+              'Microphone paused at the buffer or capture limit. Wait for uploads, then review or resume.',
+            );
+          }
+        };
+        recorder.start();
+        chunkTimer = setTimeout(() => {
+          if (recorder.state === 'recording') recorder.stop();
+        }, 8000);
+      }
+      async function stop() {
+        capturing = false;
+        clearTimeout(chunkTimer);
+        if (recorder && recorder.state === 'recording') {
+          await new Promise((resolve) => {
+            const old = recorder.onstop;
+            recorder.onstop = (e) => {
+              old(e);
+              resolve();
+            };
+            recorder.stop();
+          });
+        }
+        stream?.getTracks().forEach((t) => t.stop());
+        stream = null;
+        await queue;
+        if (pendingAudio.length) {
+          setStatus(
+            'Microphone off. Retry buffered audio before closing this session.',
+          );
+          return;
+        }
+        if (room) {
+          room = await api('stop', { id: room.id });
+          render();
+        }
+        $('start').disabled = false;
+        $('stop').disabled = true;
+        setStatus('Microphone off · capture stopped');
+      }
+      async function review(automatic = false, finalizedAt = null) {
+        if (reviewing || !room || !room.segments.length) return;
+        reviewing = true;
+        $('review').disabled = true;
+        try {
+          const result = await api('review', { id: room.id });
+          room = result.room;
+          render();
+          if (result.retryAfterMs) {
+            if (!automatic)
+              setStatus(
+                'Next review available in ' +
+                  Math.ceil(result.retryAfterMs / 1000) +
+                  's',
+              );
+            return;
+          }
+          if (result.elapsedMs) {
+            $('latency').textContent =
+              (
+                (finalizedAt === null
+                  ? result.elapsedMs
+                  : performance.now() - finalizedAt) / 1000
+              ).toFixed(1) + 's';
+            $('latency-label').textContent =
+              finalizedAt === null
+                ? 'last review latency'
+                : 'finalized audio to review';
+          }
+          if (!result.decision) return;
+          const d = result.decision;
+          if (result.suppressed && automatic) return;
+          const parts = [
+            d.title,
+            d.summary,
+            ...d.claims.map(
+              (c) => c.status + ': ' + c.text + '\n' + c.explanation,
+            ),
+            ...d.findings.map((f) => f.text),
+            'Conditions: ' +
+              (d.analysis?.review?.recommendation.conditions.join('; ') ||
+                'Need clarification'),
+            'State: ' + d.state + ' · no approval from this page',
+          ];
+          $('result').textContent = parts.join('\n\n');
+          $('result').classList.remove('empty');
+          $('sources').textContent = d.evidence
+            .map(
+              (e) =>
+                (e.synthetic ? '[SYNTHETIC] ' : '') +
+                e.sourceTitle +
+                ' · ' +
+                e.sourceDate +
+                '\n' +
+                e.excerpt +
+                '\n' +
+                e.sourceUrl,
+            )
+            .join('\n\n');
+          $('evidence').hidden = !d.evidence.length;
+          $('decision').textContent =
+            'To continue in your configured Slack channel: @DRII open ' +
+            d.decisionId +
+            (result.suppressed
+              ? ' · unchanged, muted, or dismissed suggestion'
+              : '');
+          setStatus(
+            capturing
+              ? 'Capturing · review ready'
+              : 'Review ready · microphone off',
+          );
+        } catch (e) {
+          error(e);
+        } finally {
+          reviewing = false;
+          $('review').disabled = false;
+        }
+      }
+      $('start').onclick = async () => {
+        try {
+          if (pendingAudio.length || queuedAudio)
+            throw new Error('Finish the buffered audio first.');
+          $('error').textContent = '';
+          if (
+            !navigator.mediaDevices ||
+            !window.MediaRecorder ||
+            !MediaRecorder.isTypeSupported('audio/webm')
+          )
+            throw new Error(
+              'Microphone capture needs a browser with WebM recording. Use the transcript fallback.',
+            );
+          await ensureRoom();
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          capturing = true;
+          started = performance.now() - lastTextEnd;
+          $('start').disabled = true;
+          $('stop').disabled = false;
+          setStatus('Capturing microphone');
+          captureChunk();
+        } catch (e) {
+          stream?.getTracks().forEach((t) => t.stop());
+          capturing = false;
+          error(e);
+        }
+      };
+      $('stop').onclick = () => stop().catch(error);
+      $('new').onclick = async () => {
+        try {
+          if (pendingAudio.length || queuedAudio)
+            throw new Error(
+              'Retry buffered audio before starting a new session.',
+            );
+          if (capturing) await stop();
+          room = await api('start');
+          lastTextEnd = 0;
+          render();
+          $('result').textContent = 'Ready for a new discussion.';
+          setStatus('New session · microphone off');
+        } catch (e) {
+          error(e);
+        }
+      };
+      $('append').onclick = async () => {
+        try {
+          await ensureRoom();
+          await append($('manual').value, lastTextEnd, lastTextEnd + 1000);
+          $('manual').value = '';
+          setStatus('Transcript added · microphone off');
+        } catch (e) {
+          error(e);
+        }
+      };
+      $('review').onclick = () => review();
+      $('retry-audio').onclick = async () => {
+        $('retry-audio').disabled = true;
+        try {
+          await queue;
+          while (pendingAudio.length) {
+            await submitAudio(pendingAudio[0]);
+            pendingAudio.shift();
+          }
+          $('retry-audio').hidden = true;
+          $('error').textContent = '';
+          $('start').disabled = false;
+          setStatus('Buffered audio saved. Microphone off.');
+          await review();
+        } catch (failure) {
+          error(failure);
+        } finally {
+          $('retry-audio').disabled = false;
+        }
+      };
+      $('mute').onclick = async () => {
+        try {
+          if (room) {
+            room = await api('mute', { id: room.id });
+            render();
+          }
+        } catch (e) {
+          error(e);
+        }
+      };
+      $('dismiss').onclick = async () => {
+        try {
+          if (room) {
+            room = await api('dismiss', { id: room.id });
+            render();
+            $('result').textContent =
+              'Suggestion dismissed. New evidence can still prompt a different review.';
+          }
+        } catch (e) {
+          error(e);
+        }
+      };
+      window.addEventListener('pagehide', () => {
+        capturing = false;
+        stream?.getTracks().forEach((t) => t.stop());
+      });
+      const saved = localStorage.getItem('drii-room');
+      if (saved)
+        api('status', { id: saved })
+          .then((r) => {
+            room = r;
+            lastTextEnd = r.segments.at(-1)?.endMs || 0;
+            render();
+            setStatus('Session restored · microphone off');
+          })
+          .catch(() => localStorage.removeItem('drii-room'));
+    </script>
+  </body>
+</html>

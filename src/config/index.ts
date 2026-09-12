@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 export const ConfigSchema = z.object({
+  DRII_MIN_RELEVANCE: z.coerce.number().min(-1).max(1).default(0.3),
   LOG_LEVEL: z
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
     .default('info'),

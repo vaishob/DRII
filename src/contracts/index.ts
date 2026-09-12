@@ -368,6 +368,7 @@ export type DecisionEvent = z.infer<typeof DecisionEventSchema>;
 
 export const EvidenceScopeSchema = z
   .object({
+    sourceIds: z.array(IdSchema).max(MAX_EVIDENCE_RESULTS).optional(),
     workspaceId: IdSchema,
     projectId: IdSchema,
     decisionId: IdSchema,

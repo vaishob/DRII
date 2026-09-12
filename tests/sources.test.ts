@@ -77,6 +77,36 @@ describe('synthetic company inputs', () => {
   });
 });
 describe('source ingestion', () => {
+  it('binds metric names and returns a dated structured value', async () => {
+    const { db, store } = adapters();
+    vi.mocked(db.query).mockResolvedValue([
+      {
+        name: 'available_agents',
+        value: 1,
+        unit: 'people',
+        measured_at_ms: String(Date.parse('2026-09-12T07:30:00.000Z')),
+      },
+    ]);
+    const hostileName = "agents' OR 1=1 --";
+    const result = await store.getMetric(
+      'demo-workspace',
+      'launch',
+      'support-capacity',
+      hostileName,
+      '2026-09-12T08:00:00.000Z',
+    );
+    expect(vi.mocked(db.query).mock.calls[0]?.[0]).not.toContain(hostileName);
+    expect(vi.mocked(db.query).mock.calls[0]?.[1]).toMatchObject({
+      metric: hostileName,
+      source: 'support-capacity',
+    });
+    expect(result).toEqual({
+      name: 'available_agents',
+      value: 1,
+      unit: 'people',
+      measuredAt: '2026-09-12T07:30:00.000Z',
+    });
+  });
   it('skips exact retries before requesting embeddings', async () => {
     const { db, embedder, store } = adapters();
     const source = SourceSchema.parse(documents[0]);

@@ -20,9 +20,10 @@ const RowSchema = z.object({
 // A newer restricted revision must hide an older workspace-visible revision.
 export const CURRENT_SOURCES_SQL = `
   SELECT source_id, tupleElement(latest, 1) AS payload,
-    tupleElement(latest, 3) AS chunks, tupleElement(latest, 4) AS embedding_model
+    tupleElement(latest, 3) AS chunks, tupleElement(latest, 4) AS embedding_model,
+    tupleElement(latest, 5) AS metrics
   FROM (
-    SELECT source_id, argMax(tuple(payload, visibility, chunks, embedding_model),
+    SELECT source_id, argMax(tuple(payload, visibility, chunks, embedding_model, metrics),
       tuple(revision, updated_at_ms, payload)) AS latest
     FROM drii_sources_v1
     WHERE workspace_id = {workspace:String} AND project_id = {project:String}
@@ -95,13 +96,20 @@ export class ClickHouseSourceStore implements SourceStore {
             visibility: source.visibility,
             payload: JSON.stringify(source),
             embedding_model: this.embedder.model,
-            chunks: chunks.map((c, i) => [
-              c.chunkId,
-              c.excerpt,
-              source.visibility === 'WORKSPACE'
-                ? VectorSchema.parse(vectors[i])
-                : [],
-            ]),
+            metrics: source.metrics.map((metric) => ({
+              name: metric.name,
+              value: metric.value,
+              unit: metric.unit,
+              measured_at_ms: Date.parse(metric.measuredAt),
+            })),
+            chunks: chunks.map((c, i) => ({
+              chunk_id: c.chunkId,
+              excerpt: c.excerpt,
+              embedding:
+                source.visibility === 'WORKSPACE'
+                  ? VectorSchema.parse(vectors[i])
+                  : [],
+            })),
           },
         ]);
       },
@@ -125,5 +133,45 @@ export class ClickHouseSourceStore implements SourceStore {
     return rows[0]
       ? SourceSchema.parse(JSON.parse(RowSchema.parse(rows[0]).payload))
       : null;
+  }
+
+  async getMetric(
+    workspaceId: string,
+    projectId: string,
+    sourceId: string,
+    metricName: string,
+    asOf: string,
+  ) {
+    const rows = await this.db.query(
+      `SELECT tupleElement(metric, 1) AS name,
+      tupleElement(metric, 2) AS value, tupleElement(metric, 3) AS unit,
+      toString(tupleElement(metric, 4)) AS measured_at_ms
+      FROM (${CURRENT_SOURCES_SQL}) ARRAY JOIN metrics AS metric
+      WHERE source_id = {source:String} AND tupleElement(metric, 1) = {metric:String}
+      AND tupleElement(metric, 4) <= {asOf:UInt64}
+      ORDER BY tupleElement(metric, 4) DESC LIMIT 1`,
+      {
+        workspace: IdSchema.parse(workspaceId),
+        project: IdSchema.parse(projectId),
+        source: IdSchema.parse(sourceId),
+        metric: IdSchema.parse(metricName),
+        asOf: Date.parse(TimestampSchema.parse(asOf)),
+      },
+    );
+    if (!rows[0]) return null;
+    const row = z
+      .object({
+        name: z.string(),
+        value: z.number().finite(),
+        unit: z.string(),
+        measured_at_ms: z.string().regex(/^\d+$/),
+      })
+      .parse(rows[0]);
+    return {
+      name: row.name,
+      value: row.value,
+      unit: row.unit,
+      measuredAt: new Date(Number(row.measured_at_ms)).toISOString(),
+    };
   }
 }

@@ -30,7 +30,13 @@ export function createDatabase(
     request_timeout: config.CLICKHOUSE_TIMEOUT_MS,
     application: 'drii',
     log: { level: ClickHouseLogLevel.OFF },
-    clickhouse_settings: { async_insert: 0, wait_end_of_query: 1 },
+    clickhouse_settings: {
+      async_insert: 0,
+      wait_end_of_query: 1,
+      input_format_json_named_tuples_as_objects: 1,
+      input_format_json_defaults_for_missing_elements_in_named_tuple: 0,
+      input_format_json_ignore_unknown_keys_in_named_tuple: 0,
+    },
   });
   return {
     async query(sql, parameters = {}) {

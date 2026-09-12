@@ -7,6 +7,11 @@
     "node": ">=24 <25"
   },
   "scripts": {
+    "db:seed": "node --env-file-if-exists=.env --import tsx src/data/cli.ts seed",
+    "demo:add-reply": "node --env-file-if-exists=.env --import tsx src/data/cli.ts reply",
+    "demo:query": "node --env-file-if-exists=.env --import tsx src/data/cli.ts query",
+    "demo:query:after": "node --env-file-if-exists=.env --import tsx src/data/cli.ts query-after",
+    "source:show": "node --env-file-if-exists=.env --import tsx src/data/cli.ts source",
     "db:setup": "node --env-file-if-exists=.env --import tsx src/data/cli.ts schema",
     "db:health": "node --env-file-if-exists=.env --import tsx src/data/cli.ts health",
     "dev": "node --env-file-if-exists=.env --import tsx src/index.ts",

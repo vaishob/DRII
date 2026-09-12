@@ -17,6 +17,7 @@ export const SCHEMA_STATEMENTS = [
     updated_at_ms UInt64, available_at_ms UInt64,
     visibility LowCardinality(String), payload String,
     embedding_model String,
+    metrics Array(Tuple(name String, value Float64, unit String, measured_at_ms UInt64)),
     chunks Array(Tuple(chunk_id String, excerpt String, embedding Array(Float32)))
   ) ENGINE = MergeTree ORDER BY (workspace_id, project_id, source_id, revision)`,
 ] as const;

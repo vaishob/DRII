@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AnalysisSchema } from '../intelligence/schema.js';
 
 export const SCHEMA_VERSION = '1.0' as const;
 export const EMBEDDING_DIMENSIONS = 1536;
@@ -278,6 +279,7 @@ export const DecisionSchema = z
       })
       .strict()
       .nullable(),
+    analysis: AnalysisSchema.optional(),
   })
   .strict()
   .superRefine((d, ctx) => {
@@ -354,6 +356,7 @@ export const DecisionEventSchema = z
       'APPROVED',
       'FAILED',
       'RETRIED',
+      'FOLLOW_UP_CONFIRMED',
     ]),
     actor: ActorSchema.nullable(),
     decision: DecisionSchema,
@@ -377,6 +380,7 @@ export const DecisionEventSchema = z
       APPROVED: ['APPROVED'],
       FAILED: ['FAILED'],
       EVIDENCE_ADDED: ['ANALYZING', 'NEEDS_INPUT', 'READY_FOR_REVIEW'],
+      FOLLOW_UP_CONFIRMED: ['NEEDS_INPUT'],
     };
     if (!states[event.eventType]?.includes(event.decision.state))
       ctx.addIssue({

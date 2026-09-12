@@ -2,7 +2,7 @@
 
 DRII turns fragmented organizational context into evidence-backed decisions. It reviews a meeting, retrieves company evidence, challenges unsupported assumptions, asks a missing stakeholder, and records a human-approved decision in Slack.
 
-**Status:** hackathon implementation plan. The stack below is selected; application code, credentials, deployment, and live integrations still need to be implemented and verified. Issue descriptions contain acceptance criteria, not claims of completed features.
+**Status:** the shared contracts, ClickHouse data adapters, synthetic inputs, and retrieval commands are implemented. Slack/audio and intelligence integration, live provider verification, and the complete demo remain open. Issue descriptions contain acceptance criteria, not claims of completed features.
 
 ## Demo and MVP scope
 
@@ -17,6 +17,8 @@ DRII turns fragmented organizational context into evidence-backed decisions. It 
 A pasted transcript is the explicit transcription fallback. Synthetic company records are labeled as demo data. No separate upload website is required. Live microphone input, spoken interruptions, dedicated hardware, and later outcome monitoring are stretch work.
 
 ## Selected technology stack
+
+Data-workstream setup: use Node.js 24, run `npm ci` and `npm run verify`, then follow the [deployment runbook](docs/deployment.md) for `.env`, schema setup, seeding, and evidence queries. The [shared contracts](docs/contracts.md), [evidence behavior](docs/evidence.md), and [verification record](docs/verification.md) describe the implemented boundaries and remaining live checks. `npm run dev` currently reports the scaffold status; it does not yet start a connected Slack bot.
 
 | Area | Decision | Purpose |
 | --- | --- | --- |

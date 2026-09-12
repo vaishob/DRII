@@ -32,6 +32,9 @@ export const ConfigSchema = z.object({
   SLACK_BOT_TOKEN: z.string().optional(),
   SLACK_APP_TOKEN: z.string().optional(),
   SLACK_DEMO_CHANNEL_ID: z.string().optional(),
+  DRII_DECISION_OWNER_ID: z.string().default(''),
+  DRII_ROOM_ENABLED: z.enum(['0', '1']).default('0'),
+  DRII_ROOM_TRANSCRIPTION_MODEL: z.string().min(1).default('gpt-4o-transcribe'),
 });
 export type Config = z.infer<typeof ConfigSchema>;
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -74,10 +77,29 @@ const SlackConfigSchema = ConfigSchema.extend({
     .startsWith('xapp-')
     .refine((value) => !value.includes('replace')),
   SLACK_DEMO_CHANNEL_ID: z.string().regex(/^C[A-Z0-9]+$/),
-  DRII_TRANSCRIPTION_MODEL: z
-    .literal('gpt-4o-transcribe-diarize')
-    .default('gpt-4o-transcribe-diarize'),
-  DRII_ANALYSIS_MODE: z.literal('fixture').default('fixture'),
+  DRII_ANALYSIS_MODE: z.enum(['fixture', 'live']).default('fixture'),
+}).superRefine((config, ctx) => {
+  if (config.DRII_ANALYSIS_MODE !== 'live') return;
+  const missing: string[] = [];
+  if (!config.OPENAI_API_KEY?.trim()) missing.push('OPENAI_API_KEY');
+  if (!config.CLICKHOUSE_URL || config.CLICKHOUSE_URL.includes('your-service'))
+    missing.push('CLICKHOUSE_URL');
+  if (!/^[UW][A-Z0-9]+$/.test(config.DRII_DECISION_OWNER_ID))
+    missing.push('DRII_DECISION_OWNER_ID');
+  if (!/^T[A-Z0-9]+$/.test(config.DRII_DEMO_WORKSPACE_ID))
+    missing.push('DRII_DEMO_WORKSPACE_ID');
+  for (const field of missing)
+    ctx.addIssue({
+      code: 'custom',
+      path: [field],
+      message: 'Required for live workflow',
+    });
+  if (missing.length)
+    ctx.addIssue({
+      code: 'custom',
+      path: ['DRII_ANALYSIS_MODE'],
+      message: 'Live dependencies are incomplete',
+    });
 });
 export function parseConfig(input: Record<string, string | undefined>) {
   const result = SlackConfigSchema.safeParse(input);

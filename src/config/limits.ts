@@ -1,4 +1,5 @@
 export const MAX_AUDIO_BYTES = 20_000_000;
+export const MAX_AUDIO_DURATION_SECONDS = 15 * 60;
 export const MAX_TRANSCRIPT_CHARS = 60_000;
 export const MAX_SEGMENTS = 1_000;
 export const MAX_OPTIONS = 8;

@@ -28,6 +28,7 @@ const cases = [
   "no-decision",
   "prompt-injection",
   "stale-source",
+  "conflicting-evidence",
   "missing-stakeholder",
   "temporary-tool-failure",
   "fabricated-citation",
@@ -64,6 +65,21 @@ for (const name of cases) {
           : s,
       );
     if (name === "missing-evidence") sources.sources = [];
+    if (name === "conflicting-evidence") {
+      const qa = sources.sources.find(
+        (s) => s.sourceId === "engineering-readiness",
+      )!;
+      sources.sources.push({
+        ...qa,
+        sourceId: "engineering-counter-report",
+        title: "Equally dated conflicting QA report",
+        content:
+          "The latest regression run reports zero blocking bugs. All blocking bugs are fixed.",
+        metrics: qa.metrics.map((m) =>
+          m.name === "blocking_bugs" ? { ...m, value: 0 } : m,
+        ),
+      });
+    }
     if (name === "temporary-tool-failure") sources.fail = true;
     if (name === "no-decision")
       meeting.segments = [
@@ -101,6 +117,8 @@ for (const name of cases) {
     assert(!d.evidence.some((e) => e.sourceId === "restricted-finance"));
     const blocker = d.claims.find((c) => /block|bug|fix/i.test(c.text));
     if (name === "contradicted") assert.equal(blocker?.status, "CONTRADICTED");
+    if (name === "conflicting-evidence")
+      assert.equal(blocker?.status, "INSUFFICIENT_EVIDENCE");
     if (name === "supported-counterfactual")
       assert.equal(blocker?.status, "SUPPORTED");
     if (name === "missing-evidence" || name === "temporary-tool-failure")
@@ -109,6 +127,19 @@ for (const name of cases) {
       assert.equal(d.state, "NEEDS_INPUT");
       assert.equal(d.options.length, 0);
       assert(d.followUps.length > 0);
+    }
+    if (name === "temporary-tool-failure") {
+      sources.fail = false;
+      const recovered = await workflow.challengeDecision(
+        d.workspaceId,
+        d.decisionId,
+        d.revision,
+      );
+      assert.equal(
+        recovered.claims.find((c) => /block|bug|fix/i.test(c.text))?.status,
+        "CONTRADICTED",
+      );
+      assert.equal(recovered.approval, null);
     }
     if (name === "stale-source") {
       assert.equal(

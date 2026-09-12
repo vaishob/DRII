@@ -200,19 +200,24 @@ export class ScriptedModel implements ReasoningModel {
         (e) => e.sourceId === 'engineering-readiness',
       );
       const bugs = qa?.metrics.find((m) => m.name === 'blocking_bugs')?.value;
+      const conflicting = input.evidence.find(
+        (e) => e.sourceId === 'engineering-counter-report',
+      );
       const answered = input.attributedReplies.length > 0;
       result = {
         checks: input.extraction.claims.map((c) => ({
           claimId: c.id,
           status:
-            qa && bugs !== undefined
+            qa && bugs !== undefined && !conflicting
               ? bugs === 0
                 ? 'SUPPORTED'
                 : 'CONTRADICTED'
               : 'INSUFFICIENT_EVIDENCE',
-          explanation: qa
-            ? `Measured blockers: ${bugs ?? 'unknown'}.`
-            : 'No evidence was available.',
+          explanation: conflicting
+            ? 'Equally dated QA reports conflict; the blocker status needs verification.'
+            : qa
+              ? `Measured blockers: ${bugs ?? 'unknown'}.`
+              : 'No evidence was available.',
           citations: qa
             ? [{ evidenceId: qa.evidenceId, quote: qa.excerpt }]
             : [],

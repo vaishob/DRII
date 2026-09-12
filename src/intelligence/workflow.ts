@@ -372,7 +372,33 @@ export class DurableDecisionWorkflow {
       const question = current.followUps.find(
         (f) => f.questionId === questionId,
       );
-      if (question?.answer?.sourceId === answer.sourceId) return current;
+      if (question?.answer?.sourceId === answer.sourceId) {
+        if (
+          question.answer.text !== answer.text ||
+          question.answer.actor.actorId !== answer.actor.actorId
+        )
+          throw new WorkflowError(
+            'A reply ID cannot be reused with different content or actor.',
+          );
+        if (
+          ['ANALYZING', 'FAILED', 'NEEDS_INPUT'].includes(current.state) &&
+          !current.followUps.some((f) => f.status !== 'ANSWERED')
+        ) {
+          const stored = await this.store.getMeeting(
+            workspace,
+            current.meetingId,
+          );
+          if (!stored)
+            throw new WorkflowError('Stored transcript unavailable.');
+          return this.resumeReview(
+            current,
+            stored,
+            answer,
+            `resume-retry:${current.revision}:${answer.sourceId}`,
+          );
+        }
+        return current;
+      }
       if (
         current.state !== 'NEEDS_INPUT' ||
         question?.status !== 'CONFIRMED' ||
@@ -417,35 +443,54 @@ export class DurableDecisionWorkflow {
         `answer:${answer.sourceId}`,
         answer.actor,
       );
-      if (!current.analysis?.extraction.question) {
-        const extended = MeetingSchema.parse({
-          ...meeting,
-          revision: meeting.revision + 1,
-          segments: [
-            ...meeting.segments,
-            {
-              schemaVersion: SCHEMA_VERSION,
-              workspaceId: workspace,
-              meetingId: meeting.meetingId,
-              revision: meeting.revision + 1,
-              createdAt: answer.receivedAt,
-              sourceIds: [answer.sourceId],
-              segmentId: answer.sourceId,
-              speakerLabel: answer.actor.displayName,
-              speaker: answer.actor,
-              startMs: null,
-              endMs: null,
-              text: answer.text,
-            },
-          ],
-        });
-        await this.store.ingestMeeting(extended);
-        const { analysis: _previous, ...fresh } = answered;
-        void _previous;
-        return this.review(fresh, extended, `resume:${answer.sourceId}`);
-      }
-      return this.review(answered, meeting, `resume:${answer.sourceId}`);
+      return this.resumeReview(
+        answered,
+        meeting,
+        answer,
+        `resume:${answer.sourceId}`,
+      );
     });
+  }
+  private async resumeReview(
+    current: Decision,
+    meeting: Meeting,
+    answer: NonNullable<FollowUp['answer']>,
+    key: string,
+  ): Promise<Decision> {
+    if (!current.analysis?.extraction.question) {
+      const extended = MeetingSchema.parse({
+        ...meeting,
+        revision: meeting.segments.some((s) => s.segmentId === answer.sourceId)
+          ? meeting.revision
+          : meeting.revision + 1,
+        segments: [
+          ...meeting.segments,
+          ...(meeting.segments.some((s) => s.segmentId === answer.sourceId)
+            ? []
+            : [
+                {
+                  schemaVersion: SCHEMA_VERSION,
+                  workspaceId: current.workspaceId,
+                  meetingId: meeting.meetingId,
+                  revision: meeting.revision + 1,
+                  createdAt: answer.receivedAt,
+                  sourceIds: [answer.sourceId],
+                  segmentId: answer.sourceId,
+                  speakerLabel: answer.actor.displayName,
+                  speaker: answer.actor,
+                  startMs: null,
+                  endMs: null,
+                  text: answer.text,
+                },
+              ]),
+        ],
+      });
+      await this.store.ingestMeeting(extended);
+      const { analysis: _previous, ...fresh } = current;
+      void _previous;
+      return this.review(fresh, extended, key);
+    }
+    return this.review(current, meeting, key);
   }
   async approveDecision(
     workspace: string,
@@ -481,6 +526,7 @@ export class DurableDecisionWorkflow {
             optionId,
             approvedRevision: revision,
             approvedAt: this.now(),
+            rationale: `Owner explicitly confirmed option ${optionId} for review revision ${revision}; displayed conditions and proposed actions remain part of the record.`,
           },
         },
         'APPROVED',

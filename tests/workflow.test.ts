@@ -146,15 +146,19 @@ export class TestDecisionStore implements DecisionStore {
   async ingestMeeting(m: Meeting) {
     if (
       !this.meetings.some(
-        (x) => x.meetingId === m.meetingId && x.workspaceId === m.workspaceId,
+        (x) =>
+          x.meetingId === m.meetingId &&
+          x.workspaceId === m.workspaceId &&
+          x.revision === m.revision,
       )
     )
       this.meetings.push(structuredClone(m));
   }
   async getMeeting(w: string, id: string) {
     return structuredClone(
-      this.meetings.find((m) => m.workspaceId === w && m.meetingId === id) ??
-        null,
+      this.meetings
+        .filter((m) => m.workspaceId === w && m.meetingId === id)
+        .sort((a, b) => b.revision - a.revision)[0] ?? null,
     );
   }
   async getDecision(w: string, id: string): Promise<Decision | null> {
@@ -278,6 +282,75 @@ describe('reasoning evidence boundaries', () => {
 });
 
 describe('durable human decision workflow', () => {
+  it.each([false, true])(
+    'resumes an interrupted attributed reply (clarification=%s)',
+    async (clarification) => {
+      const h = harness();
+      const generate = vi.spyOn(h.model, 'generate');
+      if (clarification)
+        generate.mockResolvedValueOnce({
+          ...extraction,
+          question: null,
+          options: [],
+          claims: [],
+          clarification: 'Which choice needs a review?',
+        });
+      const first = await h.workflow.ingestMeeting(meeting);
+      const target = { actorId: 'noor', displayName: 'Noor', role: 'Support' };
+      const confirmed = await h.workflow.confirmFollowUp(
+        meeting.workspaceId,
+        first.decisionId,
+        first.revision,
+        meeting.owner,
+        target,
+      );
+      const questionId = confirmed.followUps[0]!.questionId;
+      const answer = {
+        actor: target,
+        text: 'Decide on the pilot; support can cover it.',
+        sourceId: 'interrupted-reply',
+        receivedAt: '2026-09-12T09:00:00Z',
+      };
+      const append = h.store.appendDecisionEvent.bind(h.store);
+      const crash = vi
+        .spyOn(h.store, 'appendDecisionEvent')
+        .mockImplementationOnce(append)
+        .mockRejectedValueOnce(
+          new Error('simulated interrupted analysis write'),
+        );
+      await expect(
+        h.workflow.resumeWithEvidence(
+          meeting.workspaceId,
+          first.decisionId,
+          questionId,
+          answer,
+        ),
+      ).rejects.toThrow('interrupted');
+      crash.mockRestore();
+      const recovered = await h.workflow.resumeWithEvidence(
+        meeting.workspaceId,
+        first.decisionId,
+        questionId,
+        answer,
+      );
+      expect(recovered.state).toBe('READY_FOR_REVIEW');
+      expect(recovered.approval).toBeNull();
+      expect(
+        recovered.followUps.filter(
+          (f) => f.answer?.sourceId === answer.sourceId,
+        ),
+      ).toHaveLength(1);
+      if (clarification)
+        expect(
+          (
+            await h.store.getMeeting(meeting.workspaceId, meeting.meetingId)
+          )?.segments.filter((s) => s.segmentId === answer.sourceId),
+        ).toHaveLength(1);
+      expect(generate.mock.calls.some((c) => c[0] === 'red_team_review')).toBe(
+        true,
+      );
+    },
+  );
   it('persists the full loop, rejects wrong actors/stale actions and keeps approval immutable', async () => {
     const h = harness();
     const first = await h.workflow.ingestMeeting(meeting);

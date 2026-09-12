@@ -130,16 +130,15 @@ export class DecisionEngine {
     const retrieve = async (query: string) => {
       if (queries.size >= MAX_TOOL_QUERIES || queries.has(query)) return;
       queries.add(query);
-      const result = await this.retriever.retrieveEvidence(
-        query.slice(0, 2000),
-        {
+      const result = await this.retriever
+        .retrieveEvidence(query.slice(0, 2000), {
           workspaceId: decision.workspaceId,
           projectId: decision.projectId,
           decisionId: decision.decisionId,
           revision: decision.revision + 1,
           asOf,
-        },
-      );
+        })
+        .catch(() => ({ status: 'ERROR' as const, evidence: [] }));
       for (const e of result.evidence) evidence.set(e.evidenceId, e);
       if (result.status !== 'FOUND') gaps.push(`${result.status}: ${query}`);
     };
@@ -161,21 +160,36 @@ export class DecisionEngine {
       input(),
       (x) => validateReview(x, extraction, [...evidence.values()]),
     );
-    for (const query of review.additionalQueries) await retrieve(query);
-    const final = review.additionalQueries.length
+    const challenge = await this.model.generate(
+      'red_team_review',
+      ReviewSchema,
+      REVIEW +
+        ' This is a separate adversarial review of the initial assessment. Challenge its leading option against the shared criteria, preserve supported facts, identify the strongest evidenced failure path, and request only decision-relevant missing evidence.',
+      { ...input(), initialAssessment: review },
+      (x) => validateReview(x, extraction, [...evidence.values()]),
+    );
+    const additionalQueries = [
+      ...new Set([...challenge.additionalQueries, ...review.additionalQueries]),
+    ].slice(0, 2);
+    for (const query of additionalQueries) await retrieve(query);
+    const final = additionalQueries.length
       ? await this.model.generate(
           'final_review',
           ReviewSchema,
           REVIEW +
             ' No further tool calls are available; additionalQueries must be empty.',
-          input(),
+          {
+            ...input(),
+            initialAssessment: review,
+            redTeamAssessment: challenge,
+          },
           (x) => {
             validateReview(x, extraction, [...evidence.values()]);
             if (x.additionalQueries.length)
               throw new Error('Tool budget exhausted');
           },
         )
-      : review;
+      : challenge;
     return {
       analysis: { extraction, review: final, gaps, model: this.model.name },
       evidence: [...evidence.values()],

@@ -268,6 +268,7 @@ export const DecisionSchema = z
         optionId: IdSchema,
         approvedRevision: z.number().int().nonnegative(),
         approvedAt: TimestampSchema,
+        rationale: z.string().min(1).optional(),
       })
       .strict()
       .nullable(),

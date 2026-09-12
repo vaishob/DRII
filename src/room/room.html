@@ -332,6 +332,7 @@
     </main>
     <script>
       const token = '__ROOM_TOKEN__';
+      const canCapture = document.documentElement.dataset.offline !== 'true';
       const $ = (id) => document.getElementById(id);
       let room = null,
         stream = null,
@@ -421,7 +422,8 @@
         if (recorder?.state === 'recording') recorder.stop();
         stream?.getTracks().forEach((t) => t.stop());
         stream = null;
-        $('start').disabled = queuedAudio > 0 || pendingAudio.length > 0;
+        $('start').disabled =
+          !canCapture || queuedAudio > 0 || pendingAudio.length > 0;
         $('stop').disabled = false;
         setStatus(message);
       }
@@ -490,7 +492,7 @@
               queuedAudio--;
               if (!capturing)
                 $('start').disabled =
-                  queuedAudio > 0 || pendingAudio.length > 0;
+                  !canCapture || queuedAudio > 0 || pendingAudio.length > 0;
             });
           if (
             capturing &&
@@ -536,7 +538,7 @@
           room = await api('stop', { id: room.id });
           render();
         }
-        $('start').disabled = false;
+        $('start').disabled = !canCapture;
         $('stop').disabled = true;
         setStatus('Microphone off · capture stopped');
       }
@@ -620,6 +622,10 @@
       }
       $('start').onclick = async () => {
         try {
+          if (!canCapture)
+            throw new Error(
+              'Microphone transcription is disabled in this offline rehearsal.',
+            );
           if (pendingAudio.length || queuedAudio)
             throw new Error('Finish the buffered audio first.');
           $('error').textContent = '';
@@ -683,7 +689,7 @@
           }
           $('retry-audio').hidden = true;
           $('error').textContent = '';
-          $('start').disabled = false;
+          $('start').disabled = !canCapture;
           setStatus('Buffered audio saved. Microphone off.');
           await review();
         } catch (failure) {

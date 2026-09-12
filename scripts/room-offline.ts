@@ -29,6 +29,7 @@ const sessions = new RoomSessions(
 const html = (
   await readFile(new URL("../src/room/room.html", import.meta.url), "utf8")
 )
+  .replace('<html lang="en">', '<html lang="en" data-offline="true">')
   .replace(
     "Human approval stays in Slack",
     "SCRIPTED OFFLINE · no live accounts",

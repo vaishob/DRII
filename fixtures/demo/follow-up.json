@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "1.0",
+  "workspaceId": "demo-workspace",
+  "revision": 0,
+  "createdAt": "2026-09-12T08:10:00.000Z",
+  "sourceIds": [],
+  "sourceId": "support-follow-up",
+  "projectId": "launch",
+  "sourceType": "FOLLOW_UP",
+  "title": "SYNTHETIC DEMO: Noor confirms pilot coverage",
+  "owner": {
+    "actorId": "demo-noor",
+    "displayName": "Noor",
+    "role": "Support"
+  },
+  "content": "Noor confirms that one backup agent can join the existing agent on Friday. Two agents can cover a ten-customer pilot with billing disabled. Three agents for a broad launch are still unavailable.",
+  "visibility": "WORKSPACE",
+  "synthetic": true,
+  "updatedAt": "2026-09-12T08:10:00.000Z",
+  "availableAt": "2026-09-12T08:10:00.000Z",
+  "url": "drii://demo-workspace/launch/support-follow-up",
+  "metrics": [
+    {
+      "name": "confirmed_pilot_agents",
+      "value": 2,
+      "unit": "people",
+      "measuredAt": "2026-09-12T08:10:00.000Z"
+    }
+  ]
+}

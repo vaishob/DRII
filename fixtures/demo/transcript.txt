@@ -1,0 +1,9 @@
+SYNTHETIC DEMO — 80-second prepared meeting transcript
+
+Maya (Product): We need to decide whether to launch broadly on Friday or run a limited pilot. The checklist says a pilot can include ten customers. I care about keeping our promise without taking on more risk than we can support.
+
+Leo (Engineering): My impression from the earlier discussion was that all blocking bugs were fixed. Please verify that against the latest engineering report before we commit. A pilot with billing disabled may give us a safer way to learn.
+
+Inez (Sales): Three prospects want to evaluate this month. I heard that launching on Friday could unlock five hundred thousand dollars in annual revenue, but I do not have signed orders. We should distinguish the forecast from a commitment.
+
+Maya (Product): The old staffing plan showed four support agents, so I assumed broad coverage would be fine. Noor from Support is not in this meeting. Please check the current roster and ask whether the pilot can be covered. I will approve the final option after that answer.

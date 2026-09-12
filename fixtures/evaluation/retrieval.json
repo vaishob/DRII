@@ -1,0 +1,29 @@
+{
+  "synthetic": true,
+  "initialAsOf": "2026-09-12T08:00:00.000Z",
+  "afterReplyAsOf": "2026-09-12T08:11:00.000Z",
+  "cases": [
+    {
+      "query": "Are all blocking billing bugs fixed?",
+      "expectedSourceIds": ["engineering-readiness", "engineering-test-run"],
+      "claimStatus": "CONTRADICTED"
+    },
+    {
+      "query": "How many customers can join a limited pilot?",
+      "expectedSourceIds": ["launch-checklist"],
+      "claimStatus": "SUPPORTED"
+    },
+    {
+      "query": "Is the five hundred thousand dollars revenue forecast verified?",
+      "expectedSourceIds": ["crm-revenue-note", "crm-opportunities"],
+      "claimStatus": "INSUFFICIENT_EVIDENCE"
+    },
+    {
+      "query": "How many support agents are available Friday?",
+      "expectedSourceIds": ["support-capacity"],
+      "sourceRevision": 1
+    }
+  ],
+  "excludedSourceIds": ["restricted-finance"],
+  "laterSourceId": "support-follow-up"
+}

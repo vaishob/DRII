@@ -1,19 +1,27 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { Database } from './database.js';
 
-export async function createDecisionEventsTable(client: ClickHouseClient, database: string): Promise<void> {
-  await client.command({
-    query: `CREATE TABLE IF NOT EXISTS ${database}.decision_events (
-  event_id String,
-  workspace_id String,
-  meeting_id String,
-  decision_id String,
-  revision UInt32,
-  occurred_at DateTime64(3, 'UTC'),
-  type LowCardinality(String),
-  state LowCardinality(String),
-  actor_id Nullable(String),
-  payload String
-) ENGINE = MergeTree
-ORDER BY (decision_id, revision, occurred_at, event_id)`,
-  });
+// Append-only MergeTree tables. Logical uniqueness comes from reads and stable
+// event/revision IDs, never from background merges or insert deduplication.
+export const SCHEMA_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS drii_meetings_v1 (
+    workspace_id String, meeting_id String, revision UInt32,
+    created_at_ms UInt64, payload String
+  ) ENGINE = MergeTree ORDER BY (workspace_id, meeting_id, revision)`,
+  `CREATE TABLE IF NOT EXISTS drii_decision_events_v1 (
+    workspace_id String, decision_id String, meeting_id String,
+    revision UInt32, event_id String, deduplication_id String,
+    created_at_ms UInt64, payload String
+  ) ENGINE = MergeTree ORDER BY (workspace_id, decision_id, revision, event_id)`,
+  `CREATE TABLE IF NOT EXISTS drii_sources_v1 (
+    workspace_id String, project_id String, source_id String, revision UInt32,
+    updated_at_ms UInt64, available_at_ms UInt64,
+    visibility LowCardinality(String), payload String,
+    embedding_model String,
+    metrics Array(Tuple(name String, value Float64, unit String, measured_at_ms UInt64)),
+    chunks Array(Tuple(chunk_id String, excerpt String, embedding Array(Float32)))
+  ) ENGINE = MergeTree ORDER BY (workspace_id, project_id, source_id, revision)`,
+] as const;
+
+export async function setupSchema(db: Database): Promise<void> {
+  for (const sql of SCHEMA_STATEMENTS) await db.command(sql);
 }

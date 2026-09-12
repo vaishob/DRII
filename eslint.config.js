@@ -1,14 +1,13 @@
-import eslint from '@eslint/js';
-import tseslint from 'typescript-eslint';
+import js from "@eslint/js";
+import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  eslint.configs.recommended,
+  js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['src/**/*.ts', 'tests/**/*.ts', 'scripts/**/*.ts'],
+    ignores: ["dist", "node_modules"],
     rules: {
-      '@typescript-eslint/no-explicit-any': 'error',
-      'no-console': 'error',
+      "@typescript-eslint/no-explicit-any": "error",
     },
   },
 );

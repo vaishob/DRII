@@ -1,0 +1,3 @@
+Sales: I want to launch on Monday. I estimate that a delay puts $120,000 of revenue at risk, but I have not attached the CRM opportunities yet.
+Engineering: We still have critical bugs. I would like to check the launch checklist and rollback status before deciding.
+Product: A limited beta may be an option. We have not asked Support how many beta users they can handle.

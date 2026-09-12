@@ -2,7 +2,23 @@
 
 DRII turns fragmented organizational context into evidence-backed decisions. It reviews a meeting, retrieves company evidence, challenges unsupported assumptions, asks a missing stakeholder, and records a human-approved decision in Slack.
 
-**Status:** hackathon implementation plan. The stack below is selected; application code, credentials, deployment, and live integrations still need to be implemented and verified. Issue descriptions contain acceptance criteria, not claims of completed features.
+**Status:** first Slack intake slice implemented locally: transcript/MP3 input, OpenAI transcription adapter, threaded status messages, and an explicitly labeled fixture card with evidence/transcript buttons. The default analyzer and session storage are demo adapters. ClickHouse persistence, actual decision reasoning, follow-up, approval, and live-workspace verification remain integration work. The full flow below is the target MVP, not a claim that every issue is complete.
+
+## Run the first slice
+
+Use Node.js 24 and install the locked dependencies with `npm ci`.
+
+```sh
+npm run typecheck
+npm test
+npm run lint
+npm run build
+npm run demo:offline
+```
+
+The offline demo uses local fixtures and fake Slack transport: no tokens, uploads, or paid API calls. For the real Slack connection, follow [Slack demo setup](docs/slack-demo.md), populate your own local `.env` from `.env.example`, then use `npm run dev` (or `npm run build` and `npm start`). Creating a Slack app and supplying credentials are manual setup steps; installing this repository does not connect it automatically.
+
+Integration adapters and the remaining #3/#8 acceptance work are documented in [the handoff](docs/slack-demo.md#integration-handoff).
 
 ## Demo and MVP scope
 
@@ -18,20 +34,20 @@ A pasted transcript is the explicit transcription fallback. Synthetic company re
 
 ## Selected technology stack
 
-| Area | Decision | Purpose |
-| --- | --- | --- |
-| Runtime and language | Node.js 24 LTS, TypeScript in strict mode, ES modules | One shared backend and shared types across all three workstreams |
-| Packages | npm with a committed `package-lock.json` | Reproducible dependency versions, established in #1 |
-| Slack | `@slack/bolt`, Socket Mode, Block Kit | Events, threaded cards, buttons, and forms; no public inbound endpoint needed for the demo |
-| AI SDK and text analysis | Official `openai` Node SDK; Responses API; `gpt-4.1-2025-04-14` | Extraction, evidence assessment, follow-up reasoning, and a separate red-team call using one pinned text model |
-| Speech-to-text | `gpt-4o-transcribe-diarize` through Audio Transcriptions | Speaker-labeled segments from the prepared meeting |
-| Embeddings | `text-embedding-3-small`, explicitly 1536 dimensions | The same embedding model/dimensions for documents and queries |
-| Storage and retrieval | ClickHouse Cloud, `@clickhouse/client`, SQL cosine-distance search over `Array(Float32)` vectors | Documents, metrics, embeddings, transcripts, decision events, and source provenance |
-| Contracts and validation | `zod`, shared schemas in `src/contracts/` | Validate model output and module boundaries |
-| Workflow | Explicit TypeScript orchestrator with bounded tool calls | Resumable steps without an additional agent framework |
-| Logging | `pino` with credential/content redaction | Structured operational errors and timings |
-| Tests and code checks | `vitest`, TypeScript typecheck, ESLint, Prettier | Unit/contract tests plus separate opt-in integration/evaluation runs |
-| Demo deployment | One long-running Node process on the demo laptop, connected to ClickHouse Cloud and OpenAI | A concrete first deployment; cloud-hosted app/container packaging can follow |
+| Area                     | Decision                                                                                         | Purpose                                                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| Runtime and language     | Node.js 24 LTS, TypeScript in strict mode, ES modules                                            | One shared backend and shared types across all three workstreams                                               |
+| Packages                 | npm with a committed `package-lock.json`                                                         | Reproducible dependency versions, established in #1                                                            |
+| Slack                    | `@slack/bolt`, Socket Mode, Block Kit                                                            | Events, threaded cards, buttons, and forms; no public inbound endpoint needed for the demo                     |
+| AI SDK and text analysis | Official `openai` Node SDK; Responses API; `gpt-4.1-2025-04-14`                                  | Extraction, evidence assessment, follow-up reasoning, and a separate red-team call using one pinned text model |
+| Speech-to-text           | `gpt-4o-transcribe-diarize` through Audio Transcriptions                                         | Speaker-labeled segments from the prepared meeting                                                             |
+| Embeddings               | `text-embedding-3-small`, explicitly 1536 dimensions                                             | The same embedding model/dimensions for documents and queries                                                  |
+| Storage and retrieval    | ClickHouse Cloud, `@clickhouse/client`, SQL cosine-distance search over `Array(Float32)` vectors | Documents, metrics, embeddings, transcripts, decision events, and source provenance                            |
+| Contracts and validation | `zod`, shared schemas in `src/contracts/`                                                        | Validate model output and module boundaries                                                                    |
+| Workflow                 | Explicit TypeScript orchestrator with bounded tool calls                                         | Resumable steps without an additional agent framework                                                          |
+| Logging                  | `pino` with credential/content redaction                                                         | Structured operational errors and timings                                                                      |
+| Tests and code checks    | `vitest`, TypeScript typecheck, ESLint, Prettier                                                 | Unit/contract tests plus separate opt-in integration/evaluation runs                                           |
+| Demo deployment          | One long-running Node process on the demo laptop, connected to ClickHouse Cloud and OpenAI       | A concrete first deployment; cloud-hosted app/container packaging can follow                                   |
 
 The text model is chosen for a fixed, tool-capable Structured Outputs interface, not as a claim that it is the newest or best model. Account access, billing, and rate limits must be verified before the rehearsal. Model IDs are configurable, but changing them requires re-running the evaluation fixtures.
 
@@ -61,7 +77,7 @@ Slack audio / transcript / participant reply
 
 These are modules in one process, not three deployed microservices. Dependency injection allows local fixture adapters while teammates implement the real boundaries. The decision workflow accepts normalized data, not Slack SDK objects, so a later meeting plugin can reuse it.
 
-Planned layout (created by the implementation issues):
+Module ownership (intelligence and data implementations are still to be connected):
 
 ```text
 src/
@@ -78,15 +94,15 @@ tests/          # Each owner tests their module; Alan owns reasoning evaluations
 
 ### Shared contracts to publish first in #1
 
-| Boundary | Owner | Required behavior |
-| --- | --- | --- |
-| `transcribeMeeting(audio)` | Tolga | Return transcript segments with stable IDs, text, nullable speaker identity, and timestamps |
-| `analyzeDecision(meeting)` | Alan | Return or resume a decision revision with options, criteria, claims, findings, and next question |
-| `retrieveEvidence(query, scope)` | Vaishob | Return permitted source IDs, excerpts/metrics, timestamps, and relevance metadata |
-| `challengeDecision(decisionId, expectedRevision)` | Alan | Produce an additional sourced objection and a new review revision |
-| `resumeWithEvidence(decisionId, questionId, answer)` | Alan | Incorporate an attributed reply and explain changed findings |
-| `getDecision(decisionId)` / `appendDecisionEvent(event)` | Vaishob | Read the latest logical state and persist uniquely identified events |
-| `approveDecision(decisionId, expectedRevision, actor, option)` | Alan with Vaishob's persistence | Validate the owner and revision, then record approval; Tolga invokes it from Slack |
+| Boundary                                                       | Owner                           | Required behavior                                                                                |
+| -------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `transcribeMeeting(audio)`                                     | Tolga                           | Return transcript segments with stable IDs, text, nullable speaker identity, and timestamps      |
+| `analyzeDecision(meeting)`                                     | Alan                            | Return or resume a decision revision with options, criteria, claims, findings, and next question |
+| `retrieveEvidence(query, scope)`                               | Vaishob                         | Return permitted source IDs, excerpts/metrics, timestamps, and relevance metadata                |
+| `challengeDecision(decisionId, expectedRevision)`              | Alan                            | Produce an additional sourced objection and a new review revision                                |
+| `resumeWithEvidence(decisionId, questionId, answer)`           | Alan                            | Incorporate an attributed reply and explain changed findings                                     |
+| `getDecision(decisionId)` / `appendDecisionEvent(event)`       | Vaishob                         | Read the latest logical state and persist uniquely identified events                             |
+| `approveDecision(decisionId, expectedRevision, actor, option)` | Alan with Vaishob's persistence | Validate the owner and revision, then record approval; Tolga invokes it from Slack               |
 
 Use a versioned shared payload containing `workspaceId`, `meetingId`, `decisionId`, `revision`, and stable claim/evidence/question IDs. Keep `channelId` and `threadTs` as transport context; preserve Slack timestamps as strings. Evidence includes exact source content and its date. A follow-up is tied to both the decision and question, not just the latest channel message.
 
@@ -98,11 +114,11 @@ ClickHouse persistence uses append-only events and an explicit latest-revision q
 
 Everyone has four MVP tickets totaling **15 relative effort points**, plus one separate **5-point stretch** ticket. Points are estimates of complexity, not hours. P0 is the core path; P1 is required verification/submission work; P2 starts after the complete MVP passes.
 
-| Member | Work order | First handoff |
-| --- | --- | --- |
-| **Tolga — @tolgabippus** | [#3](https://github.com/vaishob/DRII/issues/3) transcript input → [#8](https://github.com/vaishob/DRII/issues/8) fixture card → finish #3 audio → finish #8 real analysis → [#9](https://github.com/vaishob/DRII/issues/9) follow-up/approval → [#12](https://github.com/vaishob/DRII/issues/12) rehearsal → stretch [#13](https://github.com/vaishob/DRII/issues/13) | A mention returns a card in the correct thread; then a normalized real transcript |
-| **Vaishob — @vaishob** | [#1](https://github.com/vaishob/DRII/issues/1) contracts/scaffold/storage → [#2](https://github.com/vaishob/DRII/issues/2) seed data → [#5](https://github.com/vaishob/DRII/issues/5) retrieval → [#10](https://github.com/vaishob/DRII/issues/10) reproducible deployment → stretch [#14](https://github.com/vaishob/DRII/issues/14) | Contracts and examples first; then one query returns a traceable source |
-| **Alan — @alanlim0** | [#4](https://github.com/vaishob/DRII/issues/4) extraction → [#6](https://github.com/vaishob/DRII/issues/6) evidence check/red-team → [#7](https://github.com/vaishob/DRII/issues/7) follow-up/recommendation → [#11](https://github.com/vaishob/DRII/issues/11) evaluation → stretch [#15](https://github.com/vaishob/DRII/issues/15) | Structured extraction from an agreed transcript; then a source-backed contradiction |
+| Member                   | Work order                                                                                                                                                                                                                                                                                                                                                            | First handoff                                                                       |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **Tolga — @tolgabippus** | [#3](https://github.com/vaishob/DRII/issues/3) transcript input → [#8](https://github.com/vaishob/DRII/issues/8) fixture card → finish #3 audio → finish #8 real analysis → [#9](https://github.com/vaishob/DRII/issues/9) follow-up/approval → [#12](https://github.com/vaishob/DRII/issues/12) rehearsal → stretch [#13](https://github.com/vaishob/DRII/issues/13) | A mention returns a card in the correct thread; then a normalized real transcript   |
+| **Vaishob — @vaishob**   | [#1](https://github.com/vaishob/DRII/issues/1) contracts/scaffold/storage → [#2](https://github.com/vaishob/DRII/issues/2) seed data → [#5](https://github.com/vaishob/DRII/issues/5) retrieval → [#10](https://github.com/vaishob/DRII/issues/10) reproducible deployment → stretch [#14](https://github.com/vaishob/DRII/issues/14)                                 | Contracts and examples first; then one query returns a traceable source             |
+| **Alan — @alanlim0**     | [#4](https://github.com/vaishob/DRII/issues/4) extraction → [#6](https://github.com/vaishob/DRII/issues/6) evidence check/red-team → [#7](https://github.com/vaishob/DRII/issues/7) follow-up/recommendation → [#11](https://github.com/vaishob/DRII/issues/11) evaluation → stretch [#15](https://github.com/vaishob/DRII/issues/15)                                 | Structured extraction from an agreed transcript; then a source-backed contradiction |
 
 ### Team integration checkpoints
 
@@ -121,22 +137,22 @@ Tolga creates/installs one internal Slack app, enables Socket Mode and interacti
 
 For a mention beneath an upload, resolve the root message from its known timestamp using permitted channel history, check the returned timestamp, and retrieve its file metadata. Receive subsequent replies through events rather than polling whole thread histories. [Channel history access](https://docs.slack.dev/reference/methods/conversations.history/) and [channel message events](https://docs.slack.dev/reference/events/message.channels/) document these boundaries.
 
-Alan verifies text-model access and schema parsing; Tolga verifies transcription access; Vaishob verifies embeddings and ClickHouse connectivity. This planning change does not create accounts, buy credits, or run paid API calls.
+Alan verifies text-model access and schema parsing; Tolga verifies transcription access; Vaishob verifies embeddings and ClickHouse connectivity. The offline demo and unit tests do not create accounts or run paid API calls. Submitting audio to a configured live app invokes OpenAI transcription.
 
-Configuration names to implement in #1, with placeholders in a future `.env.example`:
+Configuration ownership (`.env.example` currently includes only the first Slack/audio slice):
 
-| Configuration | Supplied by |
-| --- | --- |
-| `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `SLACK_DEMO_CHANNEL_ID` | Tolga |
-| `OPENAI_API_KEY` | Team's OpenAI project, available locally to the service |
-| `DRII_TEXT_MODEL`, `DRII_TRANSCRIPTION_MODEL`, `DRII_EMBEDDING_MODEL` | Defaults from the selected stack |
-| `CLICKHOUSE_URL`, `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `CLICKHOUSE_DATABASE` | Vaishob |
+| Configuration                                                                     | Supplied by                                             |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `SLACK_DEMO_CHANNEL_ID`                     | Tolga                                                   |
+| `OPENAI_API_KEY`                                                                  | Team's OpenAI project, available locally to the service |
+| `DRII_TEXT_MODEL`, `DRII_TRANSCRIPTION_MODEL`, `DRII_EMBEDDING_MODEL`             | Defaults from the selected stack                        |
+| `CLICKHOUSE_URL`, `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `CLICKHOUSE_DATABASE` | Vaishob                                                 |
 
-Documenting configuration names does not imply credentials have been configured. Keep secrets out of issues, commits, transcripts, and logs. The complete local setup and actual npm scripts are a deliverable of #1/#10; no runnable setup commands are claimed at this stage.
+Documenting configuration names does not imply credentials have been configured. Keep secrets out of issues, commits, transcripts, and logs. The first-slice commands are available above; database schema/seed/deployment commands remain a deliverable of #1/#10.
 
 ## Testing and demo acceptance
 
-Use Vitest for deterministic unit and contract tests with fake Slack/STT/model clients. Use separate opt-in integration tests for real ClickHouse/OpenAI/Slack access; clearly identify which were actually run. #1 creates `dev`, `build`, `typecheck`, `test`, `lint`, and `format:check` npm scripts plus the lockfile.
+Use Vitest for deterministic unit and contract tests with fake Slack/STT/model clients. Add separate opt-in integration tests for real ClickHouse/OpenAI/Slack access; clearly identify which were actually run. The first slice provides `dev`, `build`, `typecheck`, `test`, `lint`, `format:check`, and `demo:offline` scripts plus the lockfile. Provider transport tests use mocked responses and do not establish real model/account access.
 
 Before presentation, verify:
 
@@ -149,12 +165,12 @@ Before presentation, verify:
 - Provider failure produces an actionable status; the approved record survives restart.
 - Real processing time is measured. The prepared transcript/backup recording is labeled honestly if used.
 
-| Judging criterion | Proof in the demo |
-| --- | --- |
-| Core Requirements & Functionality | Audio in Slack completes the loop through a persisted human approval |
-| Innovation & Theme Alignment | A sourced objection and missing participant's reply change the shared decision |
+| Judging criterion                 | Proof in the demo                                                                  |
+| --------------------------------- | ---------------------------------------------------------------------------------- |
+| Core Requirements & Functionality | Audio in Slack completes the loop through a persisted human approval               |
+| Innovation & Theme Alignment      | A sourced objection and missing participant's reply change the shared decision     |
 | Technical Execution & Integration | ClickHouse-backed retrieval, validated outputs, traceable evidence, recovery tests |
-| Usefulness & Agentic Experience | Inspectable findings, meaningful follow-up, human control, ordered actions |
+| Usefulness & Agentic Experience   | Inspectable findings, meaningful follow-up, human control, ordered actions         |
 
 ## Deployment boundary and collaboration
 

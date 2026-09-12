@@ -2,7 +2,7 @@
 
 ## Current boundary
 
-The selected profile is one Node.js 24 process on the demo laptop, Slack Socket Mode, ClickHouse Cloud, and OpenAI APIs. The data commands below are implemented. Slack/audio transport and Alan's intelligence workflow still need to be connected before `npm run dev` can run that complete profile. See the [verification record](verification.md) for what has actually passed. Do not describe this as a working end-to-end demo yet.
+The selected profile is one Node.js 24 process on the demo laptop, Slack Socket Mode, ClickHouse Cloud, and OpenAI APIs. The data commands below and the first Slack/audio intake slice are implemented. `npm run dev` starts the Slack fixture app when valid Slack credentials are supplied. Its analyzer and session store are still temporary adapters; the actual intelligence workflow and durable Slack session storage must be connected before claiming the complete profile. See the [verification record](verification.md) for what has actually passed.
 
 ## Clean start
 
@@ -12,12 +12,12 @@ Install Node.js 24 LTS and Git. From the repository root:
 node --version
 npm ci
 npm run verify
-Copy-Item .env.example .env
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
 Copy the environment example only if `.env` does not already exist. On the original development workspace, a checksum-verified portable Node runtime is available at `.tools/node-v24.21.0-win-x64`; for that PowerShell session use `$env:Path = "$PWD\.tools\node-v24.21.0-win-x64;$env:Path"`. `.tools` is ignored and is not part of the project distribution.
 
-Fill these local `.env` values using the intended demo accounts:
+Fill these local `.env` values using the intended demo accounts. Before seeding for Slack integration, set `DRII_DEMO_WORKSPACE_ID` to the real Slack team ID and `DRII_DEMO_PROJECT_ID` to the project used by the decision workflow. The default `demo-workspace` / `launch` scope is for standalone CLI use. Seeds, source views and queries use the same configured scope; changing it creates separate scoped records without rewriting the original fixture files.
 
 | Setting                                                       | Purpose                                                                                                                 |
 | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
@@ -81,7 +81,7 @@ Run only one app process with this concurrency model. ClickHouse has no transact
 
 Missing/placeholder `CLICKHOUSE_URL` produces a configuration message before a request. Connection, authentication, permissions, and request timeouts produce a sanitized ClickHouse error. Missing OpenAI configuration is explicit; embedding failures have a separate error code. Fix persistent configuration problems before retrying. Database failures must not be represented as unsupported claims or empty evidence.
 
-The data layer bounds source size, query length, request time, vector batch size, and result count. The workflow still needs bounded retries and user-visible recoverable FAILED states. `npm run dev` currently exits after reporting the scaffold status; this is expected until transport/workflow integration is merged.
+The data layer bounds source size, query length, request time, vector batch size, and result count. The workflow still needs bounded retries and user-visible recoverable FAILED states. `npm run dev` validates Slack credentials and starts the labeled fixture intake; without credentials it exits with sanitized configuration field names. `npm run demo:offline` exercises intake, duplicate suppression and the evidence button without network calls.
 
 ## Other deployment profiles and data flows
 

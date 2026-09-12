@@ -4,6 +4,8 @@
 
 The current README selects camelCase payload fields: `schemaVersion`, `workspaceId`, `meetingId`, `decisionId`, `revision`, `sourceIds`, and `createdAt`. Database columns use snake_case. Parse inputs at each external boundary. ISO timestamps retain timezones; Slack `threadTs` stays a string. Speaker labels remain separate from nullable employee identities. IDs must be stable across retries.
 
+`fromIntakeMeeting` in `src/contracts/from-intake.ts` converts the first Slack slice's transport payload (`src/contracts/intake.ts`, numeric version 1) to the shared durable payload (version `1.0`). Supply explicit project/title/owner/time/transport context. The submitter is not automatically made the decision owner. Unknown segment timings and labels remain null; known seconds convert to milliseconds. Only an explicitly supplied identity map can resolve a speaker. The canonical audio size limit re-exports the transport's 20 MB constant.
+
 Alan owns `DecisionWorkflow`, including extraction, follow-up correlation, state transitions, and owner/revision validation. Tolga calls it from normalized Slack/audio adapters. Vaishob owns `DecisionStore`, `SourceStore`, and `EvidenceRetriever`. Storage reads require a workspace ID; retrieval also requires a project and `asOf` timestamp. No Slack SDK types cross these interfaces.
 
 ## Decision transitions and approval

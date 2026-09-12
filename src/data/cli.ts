@@ -2,12 +2,7 @@ import { loadConfig } from '../config/index.js';
 import { createLogger } from '../config/logger.js';
 import { createDatabase } from './database.js';
 import { ClickHouseDecisionStore } from './decisions.js';
-import {
-  DEMO_AFTER_REPLY_AS_OF,
-  DEMO_INITIAL_AS_OF,
-  DEMO_PROJECT,
-  DEMO_WORKSPACE,
-} from './demo.js';
+import { DEMO_AFTER_REPLY_AS_OF, DEMO_INITIAL_AS_OF } from './demo.js';
 import { OpenAIEmbedder } from './embeddings.js';
 import { ClickHouseEvidenceRetriever } from './retrieval.js';
 import { setupSchema } from './schema.js';
@@ -44,6 +39,10 @@ async function main(): Promise<void> {
         new ClickHouseDecisionStore(db),
         new ClickHouseSourceStore(db, embedder),
         command === 'reply',
+        {
+          workspaceId: config.DRII_DEMO_WORKSPACE_ID,
+          projectId: config.DRII_DEMO_PROJECT_ID,
+        },
       );
       logger.info(
         {
@@ -63,8 +62,8 @@ async function main(): Promise<void> {
         config.DRII_MIN_RELEVANCE,
       );
       const result = await retriever.retrieveEvidence(query, {
-        workspaceId: DEMO_WORKSPACE,
-        projectId: DEMO_PROJECT,
+        workspaceId: config.DRII_DEMO_WORKSPACE_ID,
+        projectId: config.DRII_DEMO_PROJECT_ID,
         decisionId: 'demo-cli',
         revision: 0,
         asOf: command === 'query' ? DEMO_INITIAL_AS_OF : DEMO_AFTER_REPLY_AS_OF,
@@ -89,8 +88,8 @@ async function main(): Promise<void> {
         embed: () => Promise.reject(new Error('Read-only source viewer')),
       });
       const source = await store.getSource(
-        DEMO_WORKSPACE,
-        DEMO_PROJECT,
+        config.DRII_DEMO_WORKSPACE_ID,
+        config.DRII_DEMO_PROJECT_ID,
         sourceId,
         DEMO_AFTER_REPLY_AS_OF,
       );

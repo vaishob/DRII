@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 export const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 export const ConfigSchema = z.object({
+  DRII_DEMO_WORKSPACE_ID: z.string().min(1).max(256).default('demo-workspace'),
+  DRII_DEMO_PROJECT_ID: z.string().min(1).max(256).default('launch'),
   DRII_MIN_RELEVANCE: z.coerce.number().min(-1).max(1).default(0.3),
   LOG_LEVEL: z
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
@@ -59,3 +61,33 @@ export function requireClickHouse(config: Config): string {
     );
   return url.href;
 }
+
+// Slack startup validates only the credentials needed by the connected intake.
+// Data CLI commands continue to use loadConfig and requireClickHouse separately.
+const SlackConfigSchema = ConfigSchema.extend({
+  SLACK_BOT_TOKEN: z
+    .string()
+    .startsWith('xoxb-')
+    .refine((value) => !value.includes('replace')),
+  SLACK_APP_TOKEN: z
+    .string()
+    .startsWith('xapp-')
+    .refine((value) => !value.includes('replace')),
+  SLACK_DEMO_CHANNEL_ID: z.string().regex(/^C[A-Z0-9]+$/),
+  DRII_TRANSCRIPTION_MODEL: z
+    .literal('gpt-4o-transcribe-diarize')
+    .default('gpt-4o-transcribe-diarize'),
+  DRII_ANALYSIS_MODE: z.literal('fixture').default('fixture'),
+});
+export function parseConfig(input: Record<string, string | undefined>) {
+  const result = SlackConfigSchema.safeParse(input);
+  if (!result.success)
+    throw new Error(
+      'Missing or invalid configuration: ' +
+        [
+          ...new Set(result.error.issues.map((issue) => issue.path.join('.'))),
+        ].join(', '),
+    );
+  return result.data;
+}
+export type SlackConfig = ReturnType<typeof parseConfig>;

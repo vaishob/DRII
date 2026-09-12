@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const SCHEMA_VERSION = '1.0' as const;
 export const EMBEDDING_DIMENSIONS = 1536;
-export const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
+export { MAX_AUDIO_BYTES } from '../config/limits.js';
 export const MAX_EVIDENCE_RESULTS = 8;
 export const IdSchema = z.string().min(1).max(256);
 export const TimestampSchema = z.iso.datetime({ offset: true });
@@ -37,14 +37,17 @@ export const TranscriptSegmentSchema = z
     ...RecordFields,
     meetingId: IdSchema,
     segmentId: IdSchema,
-    speakerLabel: z.string().min(1),
+    speakerLabel: z.string().min(1).nullable(),
     speaker: ActorSchema.nullable(),
-    startMs: z.number().int().nonnegative(),
-    endMs: z.number().int().positive(),
+    startMs: z.number().int().nonnegative().nullable(),
+    endMs: z.number().int().positive().nullable(),
     text: z.string().min(1),
   })
   .strict()
-  .refine((s) => s.endMs > s.startMs, 'Segment end must follow start');
+  .refine(
+    (s) => s.startMs === null || s.endMs === null || s.endMs > s.startMs,
+    'Segment end must follow start',
+  );
 export type TranscriptSegment = z.infer<typeof TranscriptSegmentSchema>;
 
 export const MeetingSchema = z

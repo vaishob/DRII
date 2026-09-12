@@ -9,6 +9,8 @@ export function createLogger(level = 'info') {
         'token',
         'apiKey',
         'authorization',
+        'headers',
+        'audio',
         'content',
         'text',
         'transcript',

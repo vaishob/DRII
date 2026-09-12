@@ -1,0 +1,71 @@
+{
+  "date": "2026-09-12T09:14:48.957Z",
+  "mode": "SCRIPTED_OFFLINE",
+  "model": "SCRIPTED-OFFLINE-NOT-A-MODEL",
+  "retrieval": "Explicit synthetic in-memory source adapter; not a ClickHouse test",
+  "passed": 10,
+  "total": 10,
+  "results": [
+    {
+      "name": "contradicted",
+      "passed": true,
+      "elapsedMs": 20,
+      "detail": "Schema, provenance and case assertions passed."
+    },
+    {
+      "name": "supported-counterfactual",
+      "passed": true,
+      "elapsedMs": 3,
+      "detail": "Schema, provenance and case assertions passed."
+    },
+    {
+      "name": "missing-evidence",
+      "passed": true,
+      "elapsedMs": 2,
+      "detail": "Schema, provenance and case assertions passed."
+    },
+    {
+      "name": "no-decision",
+      "passed": true,
+      "elapsedMs": 1,
+      "detail": "Schema, provenance and case assertions passed."
+    },
+    {
+      "name": "prompt-injection",
+      "passed": true,
+      "elapsedMs": 2,
+      "detail": "Schema, provenance and case assertions passed."
+    },
+    {
+      "name": "stale-source",
+      "passed": true,
+      "elapsedMs": 2,
+      "detail": "Schema, provenance and case assertions passed."
+    },
+    {
+      "name": "conflicting-evidence",
+      "passed": true,
+      "elapsedMs": 2,
+      "detail": "Schema, provenance and case assertions passed."
+    },
+    {
+      "name": "missing-stakeholder",
+      "passed": true,
+      "elapsedMs": 2,
+      "detail": "Schema, provenance and case assertions passed."
+    },
+    {
+      "name": "temporary-tool-failure",
+      "passed": true,
+      "elapsedMs": 5,
+      "detail": "Schema, provenance and case assertions passed."
+    },
+    {
+      "name": "fabricated-citation",
+      "passed": true,
+      "elapsedMs": 1,
+      "detail": "Schema, provenance and case assertions passed."
+    }
+  ],
+  "limitations": "Model responses and retrieval are scripted. These cases exercise application invariants and do not establish model quality or live account access."
+}

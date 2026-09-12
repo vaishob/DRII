@@ -1,35 +1,34 @@
-# Verification record - 2026-09-12
+﻿# Verification record — 2026-09-12
 
-## Implemented and checked offline
+## Actual results
 
-Environment: Windows PowerShell, portable official Node.js 24.21.0. Dependencies are pinned in package-lock.json.
+Windows PowerShell; official portable Node.js 24.21.0; pinned package-lock.json. Main was pulled through `c106715` (merged PR #17) into `feat/complete-decision-workflow`.
 
-After merging the Slack intake PR from main at 1e6e51c, npm run verify passed TypeScript typecheck, 84 Vitest tests across eleven files, ESLint, Prettier check, and production build. The merged verification run took 7.90 seconds in Vitest; this is an offline test duration, not product latency. Tests include contracts, conflicting/replayed events, queue recovery, actual local HTTP timeouts, source ingestion, restricted-source exclusion, metric parameters, retrieval errors, mocked OpenAI transports, Slack/audio intake, and conversion from intake to durable meeting payloads.
+- `npm run verify` passed: TypeScript, **99 tests in 16 files**, ESLint, Prettier, and the production build. The final integrated test run started at 17:14 Singapore time and took 13.47 seconds. This is test duration, not product latency.
+- `npm run eval:offline` passed **10/10** at 2026-09-12T09:14:48.957Z. [Actual JSON results](../artifacts/evaluation-offline.json) record each case. Cases cover contradiction, supported counterfactual, missing evidence, no decision, document injection, source revisions, conflicting evidence, missing stakeholder, temporary retrieval failure/recovery, and fabricated citations. Responses/retrieval are explicitly scripted; this is not evidence of model quality.
+- `npm run demo:offline` passed with zero external calls and duplicate intake suppression. Full workflow controller tests separately cover targeted replies, wrong actors, stale approvals, duplicates, new controller instances, approval immutability, and recovery after an interrupted reply write.
+- Real OpenAI SDK parsing is exercised with mocked HTTP: valid structured responses, bounded repair and sanitized provider errors. No paid model evaluation was run.
+- Browser checks in headless Chrome passed: transcript submission, contradiction rendering, exact evidence inspection, refresh restoration, one failed request followed by exactly one stored segment, no repeated mute action after a lost response, and retry of a retained already-transcribed chunk. The latter uses synthetic text; it does not verify microphone/STT access. No browser errors appeared. The final axe 4.12.1 scan of the rendered review had zero violations, 34 passes and no incomplete checks; the earlier mobile check had no horizontal overflow. [Accessibility JSON](../artifacts/room-accessibility.json) and the [final screenshot](../artifacts/room-final.png) are saved.
 
-npm run demo:offline also passed. It ran the real intake controller with fake Slack transport, suppressed a duplicate request, rendered the explicitly labeled fixture card, and handled the evidence button with zero external calls. This does not establish live Slack access or real reasoning.
+The [offline room backup](../artifacts/room-demo-backup.webm) uses scripted adapters. Playback was slowed for readability; video duration is not measured application latency. [Desktop](../artifacts/room-initial.png), [review](../artifacts/room-review.png), and [mobile](../artifacts/room-mobile.png) screenshots show the rehearsal interface.
 
-The fixture contains 10 versioned records, 9 logical sources, 8 visible sources, one restricted source, and a separate later reply. These counts describe prepared input files, not a verified live database corpus. Runtime modules never import the separate evaluation expectations.
+## Live acceptance remains open
 
-## Required live and team gates still open
+No root `.env` was available. The opt-in ClickHouse integration tests, real embeddings, real model evaluation, Slack round trip, microphone transcription and second-person rehearsal have **not** been recorded as passing.
 
-No root .env with ClickHouse/OpenAI/Slack credentials was available during implementation. Live SQL execution, database durability, actual embedding access, relevance calibration, Slack access, and live latency have not been verified. Opt-in integration tests are implemented but are not recorded as passing live tests.
+| Gate                | Required evidence                                                                                                                                                            |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Database and corpus | Run schema/health/seed twice on the intended endpoint. Confirm 10 revisions, 9 logical sources, 8 visible and 1 restricted. Run source/query commands.                       |
+| Persistence         | Run `DRII_LIVE_TESTS=1 npm run test:integration` using the shell-specific environment syntax. Reload receipts and an approved snapshot after reconnect.                      |
+| Reasoning           | Run `npm run eval:model`, review semantic source support, and record the actual model/configuration and failures.                                                            |
+| Slack/audio         | Use the real allowlisted channel and owner. Rehearse audio and transcript, evidence, challenge, recipient selection, teammate reply, approval, restart and provider failure. |
+| Room                | Check actual microphone permission, silent/noisy intervals, transcription quality, stop/reconnect, and finalized-audio-to-review latency.                                    |
+| Submission          | Confirm the event limit/URL, complete a second-person clean start, capture a full live backup and check reviewer access to the final links.                                  |
 
-| Gate                                  | Status / evidence needed                                                                                       |
-| ------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Dependency installation               | Passed: clean npm ci on combined lockfile, full offline checks and sanitized missing-credential startup        |
-| ClickHouse schema and seed twice      | Pending endpoint/credentials; record logical counts and errors                                                 |
-| Real-model seeded retrieval           | Pending credentials; run held-out queries and record results and elapsedMs                                     |
-| Approved snapshot survives reconnect  | Real ClickHouse integration test pending                                                                       |
-| Source views and restricted exclusion | Offline boundaries pass; live source:show/query checks pending                                                 |
-| Shared payload agreement              | Examples and intake conversion ready for Tolga/Alan review                                                     |
-| Complete Slack loop                   | Fixture intake passes offline; actual reasoning, durable Slack sessions, follow-up and approval remain unwired |
-| Second-teammate clean-start rehearsal | Pending integrated application and accounts                                                                    |
-| Stretch issue 14                      | Deferred until issue 12 passes, as required by that issue                                                      |
+The selected deployment profile is one laptop-hosted Node process with Slack Socket Mode, ClickHouse and configurable inference endpoints. Room and Slack share that process. Live hosting is not verified; a self-hosted ClickHouse alternative is documented only. ClickHouse and Slack delivery are not a single transaction; ambiguous message delivery requires human inspection instead of automatic resending. Raw audio pending retry exists only in browser memory until saved.
 
-## Merge and review handoff
+## Integration of concurrent work
 
-The final branch feat/10-demo-runbook includes the team's Slack intake main commit 1e6e51c and resolves overlapping package, lockfile, config, entrypoint, environment-example and TypeScript settings. Slack startup retains strict credential validation and fixture-only analysis. Data CLI commands validate their own credentials independently. The upstream macOS optional test-runner binding is preserved, and imported Slack code retains its formatting style.
+PR #17 landed during this implementation. Its parallel scaffold imported schemas that the merged shared-contract barrel did not export, producing type errors. The integrated app uses `src/contracts/index.ts`, `src/contracts/services.ts`, `src/data/decisions.ts`, and `DurableDecisionWorkflow`. The incompatible duplicate scaffold and its duplicate tests were consolidated into those implementations. Its contract-validation, event deduplication/latest-revision, and workflow/source-provenance cases remain covered in `tests/contracts.test.ts`, `tests/persistence.test.ts`, and `tests/workflow.test.ts`; conflicting replay payloads are rejected explicitly. The package's intelligence entrypoint exports the working engine, model adapter and durable workflow.
 
-Earlier branches feat/1-contracts-storage, feat/2-demo-data, and feat/5-evidence-retrieval remain local implementation checkpoints. Review the final integrated branch against main; earlier standalone scaffold branches can conflict with the newly landed upstream scaffold. Feature branches have not been pushed and issues have not been closed. The README's push-approval rule still applies.
-
-Issue 1 still needs shared interface agreement and live persistence verification. Issues 2 and 5 need real seed/retrieval evidence. Issue 10 has the runbook and offline checks; the fully tested selected deployment and second-person rehearsal remain open. These limitations prevent claiming a finished working MVP.
+See the [issue audit](implementation-progress.md) and [current runbook](workflow.md). Implemented code and passing offline checks do not by themselves close the account-dependent acceptance criteria.

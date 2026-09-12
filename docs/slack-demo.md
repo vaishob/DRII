@@ -1,5 +1,7 @@
 # First Slack slice: setup and handoff
 
+Historical fixture-slice notes. For the now-implemented live workflow, durable storage, participant replies, approval and room capture, use the [current workflow runbook](workflow.md). Statements below about unwired features describe the original fixture-only slice.
+
 This implementation covers the first usable portions of #3 and #8. It can receive a transcript or one MP3 from Slack, call the configured transcription API, and show an interactive fixture card. It does not yet evaluate the meeting, retrieve company data, ask stakeholders, approve decisions, or persist them across restarts.
 
 ## Local verification without accounts

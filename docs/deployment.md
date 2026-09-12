@@ -2,7 +2,7 @@
 
 ## Current boundary
 
-The selected profile is one Node.js 24 process on the demo laptop, Slack Socket Mode, ClickHouse Cloud, and OpenAI APIs. The data commands below and the first Slack/audio intake slice are implemented. `npm run dev` starts the Slack fixture app when valid Slack credentials are supplied. Its analyzer and session store are still temporary adapters; the actual intelligence workflow and durable Slack session storage must be connected before claiming the complete profile. See the [verification record](verification.md) for what has actually passed.
+The current integrated instructions are in the [workflow runbook](workflow.md). The selected profile is one Node.js 24 process on the demo laptop, Slack Socket Mode, ClickHouse Cloud, and OpenAI APIs. Live reasoning, durable sessions, follow-up and approval are connected when `DRII_ANALYSIS_MODE=live`; account verification remains pending. The data setup commands below also apply to this profile. The original handoff notes further below describe the earlier implementation stage and are superseded by the current runbook.
 
 ## Clean start
 

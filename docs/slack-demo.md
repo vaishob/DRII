@@ -60,7 +60,7 @@ Missing API access, a download failure, or failed transcription shows a retry/tr
 
 ## Integration handoff
 
-The initial boundary is `src/contracts/intake.ts`. It is intentionally small so Vaishob can reconcile it with #1 before the other modules merge.
+The initial transport boundary is `src/contracts/intake.ts`. The shared durable contract is now in `src/contracts/index.ts`; use `fromIntakeMeeting` from `src/contracts/from-intake.ts` with explicit project/owner/time context to convert it. Unknown timing and speaker identity are preserved. See [shared contracts](contracts.md). The current synchronous `RunStore` remains the temporary Slack session adapter; wiring durable async session state and the real decision workflow is still required.
 
 | Owner   | Boundary                                            | Next action                                                                                                                                            |
 | ------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |

@@ -2,7 +2,7 @@
 
 DRII turns fragmented organizational context into evidence-backed decisions. It reviews a meeting, retrieves company evidence, challenges unsupported assumptions, asks a missing stakeholder, and records a human-approved decision in Slack.
 
-**Status:** first Slack intake slice implemented locally: transcript/MP3 input, OpenAI transcription adapter, threaded status messages, and an explicitly labeled fixture card with evidence/transcript buttons. The default analyzer and session storage are demo adapters. ClickHouse persistence, actual decision reasoning, follow-up, approval, and live-workspace verification remain integration work. The full flow below is the target MVP, not a claim that every issue is complete.
+**Status:** the Slack transcript/MP3 intake and labeled fixture cards are implemented, alongside shared contracts, ClickHouse data adapters, synthetic inputs and retrieval commands. Slack still uses the fixture analyzer and temporary session store. Live reasoning, persistent Slack session integration, follow-up, approval, and real-workspace verification remain open; the complete flow below is the target MVP.
 
 ## Run the first slice
 
@@ -31,6 +31,10 @@ Integration adapters and the remaining #3/#8 acceptance work are documented in [
 7. The decision, evidence, ordered actions, assumptions, and approval revision remain retrievable.
 
 A pasted transcript is the explicit transcription fallback. Synthetic company records are labeled as demo data. No separate upload website is required. Live microphone input, spoken interruptions, dedicated hardware, and later outcome monitoring are stretch work.
+
+## Data workstream setup
+
+Run `npm run verify`, then follow the [deployment runbook](docs/deployment.md) for ClickHouse/OpenAI configuration, schema setup, seeding, and evidence queries. See the [shared contracts](docs/contracts.md), [evidence behavior](docs/evidence.md), and [verification record](docs/verification.md) for implemented boundaries and remaining checks.
 
 ## Selected technology stack
 
@@ -139,7 +143,7 @@ For a mention beneath an upload, resolve the root message from its known timesta
 
 Alan verifies text-model access and schema parsing; Tolga verifies transcription access; Vaishob verifies embeddings and ClickHouse connectivity. The offline demo and unit tests do not create accounts or run paid API calls. Submitting audio to a configured live app invokes OpenAI transcription.
 
-Configuration ownership (`.env.example` currently includes only the first Slack/audio slice):
+Configuration ownership (`.env.example` includes the Slack/audio and data settings):
 
 | Configuration                                                                     | Supplied by                                             |
 | --------------------------------------------------------------------------------- | ------------------------------------------------------- |
@@ -148,7 +152,7 @@ Configuration ownership (`.env.example` currently includes only the first Slack/
 | `DRII_TEXT_MODEL`, `DRII_TRANSCRIPTION_MODEL`, `DRII_EMBEDDING_MODEL`             | Defaults from the selected stack                        |
 | `CLICKHOUSE_URL`, `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `CLICKHOUSE_DATABASE` | Vaishob                                                 |
 
-Documenting configuration names does not imply credentials have been configured. Keep secrets out of issues, commits, transcripts, and logs. The first-slice commands are available above; database schema/seed/deployment commands remain a deliverable of #1/#10.
+Documenting configuration names does not imply credentials have been configured. Keep secrets out of issues, commits, transcripts, and logs. The first-slice commands are available above; database schema/seed/retrieval commands are documented in the deployment runbook; live verification remains open.
 
 ## Testing and demo acceptance
 

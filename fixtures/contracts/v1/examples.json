@@ -1,0 +1,483 @@
+{
+  "Meeting": {
+    "schemaVersion": "1.0",
+    "workspaceId": "demo-workspace",
+    "revision": 0,
+    "createdAt": "2026-09-12T08:00:00.000Z",
+    "sourceIds": ["demo-transcript"],
+    "meetingId": "demo-meeting",
+    "projectId": "launch",
+    "title": "Synthetic launch review",
+    "owner": {
+      "actorId": "demo-owner",
+      "displayName": "Maya",
+      "role": "Product"
+    },
+    "inputType": "TRANSCRIPT",
+    "synthetic": true,
+    "transport": {
+      "channelId": "demo-channel",
+      "threadTs": "1789200000.000001"
+    },
+    "segments": [
+      {
+        "schemaVersion": "1.0",
+        "workspaceId": "demo-workspace",
+        "revision": 0,
+        "createdAt": "2026-09-12T08:00:00.000Z",
+        "sourceIds": ["demo-transcript"],
+        "meetingId": "demo-meeting",
+        "segmentId": "segment-1",
+        "speakerLabel": "Speaker 1",
+        "speaker": {
+          "actorId": "demo-owner",
+          "displayName": "Maya",
+          "role": "Product"
+        },
+        "startMs": 0,
+        "endMs": 10000,
+        "text": "Should we launch broadly on Friday or run a limited pilot?"
+      }
+    ]
+  },
+  "TranscriptSegment": {
+    "schemaVersion": "1.0",
+    "workspaceId": "demo-workspace",
+    "revision": 0,
+    "createdAt": "2026-09-12T08:00:00.000Z",
+    "sourceIds": ["demo-transcript"],
+    "meetingId": "demo-meeting",
+    "segmentId": "segment-1",
+    "speakerLabel": "Speaker 1",
+    "speaker": {
+      "actorId": "demo-owner",
+      "displayName": "Maya",
+      "role": "Product"
+    },
+    "startMs": 0,
+    "endMs": 10000,
+    "text": "Should we launch broadly on Friday or run a limited pilot?"
+  },
+  "Decision": {
+    "schemaVersion": "1.0",
+    "workspaceId": "demo-workspace",
+    "revision": 1,
+    "createdAt": "2026-09-12T08:00:00.000Z",
+    "sourceIds": ["demo-transcript"],
+    "decisionId": "demo-decision",
+    "meetingId": "demo-meeting",
+    "projectId": "launch",
+    "owner": {
+      "actorId": "demo-owner",
+      "displayName": "Maya",
+      "role": "Product"
+    },
+    "title": "Synthetic launch review",
+    "summary": "Choose a launch scope after confirming readiness.",
+    "state": "NEEDS_INPUT",
+    "options": [
+      {
+        "schemaVersion": "1.0",
+        "workspaceId": "demo-workspace",
+        "revision": 1,
+        "createdAt": "2026-09-12T08:00:00.000Z",
+        "sourceIds": ["demo-transcript"],
+        "decisionId": "demo-decision",
+        "optionId": "pilot",
+        "title": "Limited pilot",
+        "description": "Launch to ten opted-in customers after confirming support capacity."
+      }
+    ],
+    "claims": [
+      {
+        "schemaVersion": "1.0",
+        "workspaceId": "demo-workspace",
+        "revision": 1,
+        "createdAt": "2026-09-12T08:00:00.000Z",
+        "sourceIds": ["demo-transcript"],
+        "decisionId": "demo-decision",
+        "claimId": "claim-pilot",
+        "text": "The pilot is limited to ten customers.",
+        "speaker": {
+          "actorId": "demo-owner",
+          "displayName": "Maya",
+          "role": "Product"
+        },
+        "status": "SUPPORTED",
+        "evidenceIds": ["evidence-checklist"],
+        "explanation": "The launch checklist states the pilot limit."
+      }
+    ],
+    "evidence": [
+      {
+        "schemaVersion": "1.0",
+        "workspaceId": "demo-workspace",
+        "revision": 1,
+        "createdAt": "2026-09-12T08:00:00.000Z",
+        "sourceIds": ["demo-transcript"],
+        "decisionId": "demo-decision",
+        "evidenceId": "evidence-checklist",
+        "sourceId": "launch-checklist",
+        "sourceRevision": 0,
+        "chunkId": "checklist-chunk-1",
+        "excerpt": "A pilot is limited to ten customers.",
+        "sourceTitle": "Synthetic launch checklist",
+        "sourceType": "CHECKLIST",
+        "sourceDate": "2026-09-12T08:00:00.000Z",
+        "sourceUrl": "drii://demo-workspace/launch/launch-checklist",
+        "owner": {
+          "actorId": "demo-owner",
+          "displayName": "Maya",
+          "role": "Product"
+        },
+        "synthetic": true,
+        "metrics": [],
+        "relevance": {
+          "method": "COSINE",
+          "score": 0.8,
+          "model": "text-embedding-3-small"
+        }
+      }
+    ],
+    "priorities": [
+      {
+        "actor": {
+          "actorId": "demo-owner",
+          "displayName": "Maya",
+          "role": "Product"
+        },
+        "description": "Meet the launch date without overloading support.",
+        "weight": null,
+        "weightConfirmed": false
+      }
+    ],
+    "findings": [
+      {
+        "findingId": "finding-pilot",
+        "kind": "CHECK",
+        "text": "Pilot scope is documented; staffing needs confirmation.",
+        "evidenceIds": ["evidence-checklist"]
+      }
+    ],
+    "followUps": [
+      {
+        "schemaVersion": "1.0",
+        "workspaceId": "demo-workspace",
+        "revision": 1,
+        "createdAt": "2026-09-12T08:00:00.000Z",
+        "sourceIds": ["demo-transcript"],
+        "decisionId": "demo-decision",
+        "questionId": "question-support",
+        "question": "Can Support staff the pilot on Friday?",
+        "target": null,
+        "status": "PROPOSED",
+        "answer": null
+      }
+    ],
+    "actions": [
+      {
+        "schemaVersion": "1.0",
+        "workspaceId": "demo-workspace",
+        "revision": 1,
+        "createdAt": "2026-09-12T08:00:00.000Z",
+        "sourceIds": ["demo-transcript"],
+        "decisionId": "demo-decision",
+        "actionId": "action-1",
+        "order": 1,
+        "description": "Confirm support staffing.",
+        "owner": null,
+        "dueAt": null
+      }
+    ],
+    "assumptions": [
+      {
+        "schemaVersion": "1.0",
+        "workspaceId": "demo-workspace",
+        "revision": 1,
+        "createdAt": "2026-09-12T08:00:00.000Z",
+        "sourceIds": ["demo-transcript"],
+        "decisionId": "demo-decision",
+        "assumptionId": "assumption-support",
+        "text": "At least two support staff are available.",
+        "status": "UNKNOWN",
+        "metric": {
+          "name": "available_agents",
+          "operator": "GTE",
+          "threshold": 2,
+          "unit": "people"
+        }
+      }
+    ],
+    "recommendedOptionId": null,
+    "approval": null,
+    "failure": null
+  },
+  "Option": {
+    "schemaVersion": "1.0",
+    "workspaceId": "demo-workspace",
+    "revision": 1,
+    "createdAt": "2026-09-12T08:00:00.000Z",
+    "sourceIds": ["demo-transcript"],
+    "decisionId": "demo-decision",
+    "optionId": "pilot",
+    "title": "Limited pilot",
+    "description": "Launch to ten opted-in customers after confirming support capacity."
+  },
+  "Claim": {
+    "schemaVersion": "1.0",
+    "workspaceId": "demo-workspace",
+    "revision": 1,
+    "createdAt": "2026-09-12T08:00:00.000Z",
+    "sourceIds": ["demo-transcript"],
+    "decisionId": "demo-decision",
+    "claimId": "claim-pilot",
+    "text": "The pilot is limited to ten customers.",
+    "speaker": {
+      "actorId": "demo-owner",
+      "displayName": "Maya",
+      "role": "Product"
+    },
+    "status": "SUPPORTED",
+    "evidenceIds": ["evidence-checklist"],
+    "explanation": "The launch checklist states the pilot limit."
+  },
+  "Evidence": {
+    "schemaVersion": "1.0",
+    "workspaceId": "demo-workspace",
+    "revision": 1,
+    "createdAt": "2026-09-12T08:00:00.000Z",
+    "sourceIds": ["demo-transcript"],
+    "decisionId": "demo-decision",
+    "evidenceId": "evidence-checklist",
+    "sourceId": "launch-checklist",
+    "sourceRevision": 0,
+    "chunkId": "checklist-chunk-1",
+    "excerpt": "A pilot is limited to ten customers.",
+    "sourceTitle": "Synthetic launch checklist",
+    "sourceType": "CHECKLIST",
+    "sourceDate": "2026-09-12T08:00:00.000Z",
+    "sourceUrl": "drii://demo-workspace/launch/launch-checklist",
+    "owner": {
+      "actorId": "demo-owner",
+      "displayName": "Maya",
+      "role": "Product"
+    },
+    "synthetic": true,
+    "metrics": [],
+    "relevance": {
+      "method": "COSINE",
+      "score": 0.8,
+      "model": "text-embedding-3-small"
+    }
+  },
+  "FollowUp": {
+    "schemaVersion": "1.0",
+    "workspaceId": "demo-workspace",
+    "revision": 1,
+    "createdAt": "2026-09-12T08:00:00.000Z",
+    "sourceIds": ["demo-transcript"],
+    "decisionId": "demo-decision",
+    "questionId": "question-support",
+    "question": "Can Support staff the pilot on Friday?",
+    "target": null,
+    "status": "PROPOSED",
+    "answer": null
+  },
+  "Action": {
+    "schemaVersion": "1.0",
+    "workspaceId": "demo-workspace",
+    "revision": 1,
+    "createdAt": "2026-09-12T08:00:00.000Z",
+    "sourceIds": ["demo-transcript"],
+    "decisionId": "demo-decision",
+    "actionId": "action-1",
+    "order": 1,
+    "description": "Confirm support staffing.",
+    "owner": null,
+    "dueAt": null
+  },
+  "Assumption": {
+    "schemaVersion": "1.0",
+    "workspaceId": "demo-workspace",
+    "revision": 1,
+    "createdAt": "2026-09-12T08:00:00.000Z",
+    "sourceIds": ["demo-transcript"],
+    "decisionId": "demo-decision",
+    "assumptionId": "assumption-support",
+    "text": "At least two support staff are available.",
+    "status": "UNKNOWN",
+    "metric": {
+      "name": "available_agents",
+      "operator": "GTE",
+      "threshold": 2,
+      "unit": "people"
+    }
+  },
+  "DecisionEvent": {
+    "schemaVersion": "1.0",
+    "workspaceId": "demo-workspace",
+    "revision": 1,
+    "createdAt": "2026-09-12T08:00:00.000Z",
+    "sourceIds": ["demo-transcript"],
+    "decisionId": "demo-decision",
+    "eventId": "event-input-1",
+    "deduplicationId": "demo-request-1",
+    "meetingId": "demo-meeting",
+    "eventType": "INPUT_REQUESTED",
+    "actor": null,
+    "decision": {
+      "schemaVersion": "1.0",
+      "workspaceId": "demo-workspace",
+      "revision": 1,
+      "createdAt": "2026-09-12T08:00:00.000Z",
+      "sourceIds": ["demo-transcript"],
+      "decisionId": "demo-decision",
+      "meetingId": "demo-meeting",
+      "projectId": "launch",
+      "owner": {
+        "actorId": "demo-owner",
+        "displayName": "Maya",
+        "role": "Product"
+      },
+      "title": "Synthetic launch review",
+      "summary": "Choose a launch scope after confirming readiness.",
+      "state": "NEEDS_INPUT",
+      "options": [
+        {
+          "schemaVersion": "1.0",
+          "workspaceId": "demo-workspace",
+          "revision": 1,
+          "createdAt": "2026-09-12T08:00:00.000Z",
+          "sourceIds": ["demo-transcript"],
+          "decisionId": "demo-decision",
+          "optionId": "pilot",
+          "title": "Limited pilot",
+          "description": "Launch to ten opted-in customers after confirming support capacity."
+        }
+      ],
+      "claims": [
+        {
+          "schemaVersion": "1.0",
+          "workspaceId": "demo-workspace",
+          "revision": 1,
+          "createdAt": "2026-09-12T08:00:00.000Z",
+          "sourceIds": ["demo-transcript"],
+          "decisionId": "demo-decision",
+          "claimId": "claim-pilot",
+          "text": "The pilot is limited to ten customers.",
+          "speaker": {
+            "actorId": "demo-owner",
+            "displayName": "Maya",
+            "role": "Product"
+          },
+          "status": "SUPPORTED",
+          "evidenceIds": ["evidence-checklist"],
+          "explanation": "The launch checklist states the pilot limit."
+        }
+      ],
+      "evidence": [
+        {
+          "schemaVersion": "1.0",
+          "workspaceId": "demo-workspace",
+          "revision": 1,
+          "createdAt": "2026-09-12T08:00:00.000Z",
+          "sourceIds": ["demo-transcript"],
+          "decisionId": "demo-decision",
+          "evidenceId": "evidence-checklist",
+          "sourceId": "launch-checklist",
+          "sourceRevision": 0,
+          "chunkId": "checklist-chunk-1",
+          "excerpt": "A pilot is limited to ten customers.",
+          "sourceTitle": "Synthetic launch checklist",
+          "sourceType": "CHECKLIST",
+          "sourceDate": "2026-09-12T08:00:00.000Z",
+          "sourceUrl": "drii://demo-workspace/launch/launch-checklist",
+          "owner": {
+            "actorId": "demo-owner",
+            "displayName": "Maya",
+            "role": "Product"
+          },
+          "synthetic": true,
+          "metrics": [],
+          "relevance": {
+            "method": "COSINE",
+            "score": 0.8,
+            "model": "text-embedding-3-small"
+          }
+        }
+      ],
+      "priorities": [
+        {
+          "actor": {
+            "actorId": "demo-owner",
+            "displayName": "Maya",
+            "role": "Product"
+          },
+          "description": "Meet the launch date without overloading support.",
+          "weight": null,
+          "weightConfirmed": false
+        }
+      ],
+      "findings": [
+        {
+          "findingId": "finding-pilot",
+          "kind": "CHECK",
+          "text": "Pilot scope is documented; staffing needs confirmation.",
+          "evidenceIds": ["evidence-checklist"]
+        }
+      ],
+      "followUps": [
+        {
+          "schemaVersion": "1.0",
+          "workspaceId": "demo-workspace",
+          "revision": 1,
+          "createdAt": "2026-09-12T08:00:00.000Z",
+          "sourceIds": ["demo-transcript"],
+          "decisionId": "demo-decision",
+          "questionId": "question-support",
+          "question": "Can Support staff the pilot on Friday?",
+          "target": null,
+          "status": "PROPOSED",
+          "answer": null
+        }
+      ],
+      "actions": [
+        {
+          "schemaVersion": "1.0",
+          "workspaceId": "demo-workspace",
+          "revision": 1,
+          "createdAt": "2026-09-12T08:00:00.000Z",
+          "sourceIds": ["demo-transcript"],
+          "decisionId": "demo-decision",
+          "actionId": "action-1",
+          "order": 1,
+          "description": "Confirm support staffing.",
+          "owner": null,
+          "dueAt": null
+        }
+      ],
+      "assumptions": [
+        {
+          "schemaVersion": "1.0",
+          "workspaceId": "demo-workspace",
+          "revision": 1,
+          "createdAt": "2026-09-12T08:00:00.000Z",
+          "sourceIds": ["demo-transcript"],
+          "decisionId": "demo-decision",
+          "assumptionId": "assumption-support",
+          "text": "At least two support staff are available.",
+          "status": "UNKNOWN",
+          "metric": {
+            "name": "available_agents",
+            "operator": "GTE",
+            "threshold": 2,
+            "unit": "people"
+          }
+        }
+      ],
+      "recommendedOptionId": null,
+      "approval": null,
+      "failure": null
+    }
+  }
+}

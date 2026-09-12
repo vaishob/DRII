@@ -1,0 +1,22 @@
+{
+  "singleQuote": true,
+  "trailingComma": "all",
+  "overrides": [
+    {
+      "files": [
+        "src/slack/**/*.ts",
+        "src/audio/**/*.ts",
+        "src/config/limits.ts",
+        "src/contracts/intake.ts",
+        "tests/adapters.test.ts",
+        "tests/audio.test.ts",
+        "tests/helpers.ts",
+        "tests/intake.test.ts",
+        "scripts/**/*.ts"
+      ],
+      "options": {
+        "singleQuote": false
+      }
+    }
+  ]
+}

@@ -1,22 +1,13 @@
-import OpenAI from "openai";
-import pino from "pino";
-import { createTranscriber } from "./audio/transcribe.js";
-import { parseConfig } from "./config/index.js";
-import { SHUTDOWN_TIMEOUT_MS } from "./config/limits.js";
-import { createSlackApp } from "./slack/app.js";
-import { fixtureAnalyzer } from "./slack/fixture-analyzer.js";
-import { MemoryRunStore } from "./slack/run-store.js";
+import OpenAI from 'openai';
+import { createLogger } from './config/logger.js';
+import { createTranscriber } from './audio/transcribe.js';
+import { parseConfig } from './config/index.js';
+import { SHUTDOWN_TIMEOUT_MS } from './config/limits.js';
+import { createSlackApp } from './slack/app.js';
+import { fixtureAnalyzer } from './slack/fixture-analyzer.js';
+import { MemoryRunStore } from './slack/run-store.js';
 
-const logger = pino({
-  redact: [
-    "token",
-    "apiKey",
-    "authorization",
-    "headers",
-    "transcript",
-    "audio",
-  ],
-});
+const logger = createLogger();
 
 async function start(): Promise<void> {
   let config;
@@ -26,16 +17,19 @@ async function start(): Promise<void> {
     logger.error(
       {
         configuration:
-          error instanceof Error ? error.message : "Invalid configuration",
+          error instanceof Error ? error.message : 'Invalid configuration',
       },
-      "Startup configuration failed",
+      'Startup configuration failed',
     );
     process.exitCode = 1;
     return;
   }
   logger.level = config.LOG_LEVEL;
   const client = config.OPENAI_API_KEY?.trim()
-    ? new OpenAI({ apiKey: config.OPENAI_API_KEY })
+    ? new OpenAI({
+        apiKey: config.OPENAI_API_KEY,
+        baseURL: config.OPENAI_BASE_URL,
+      })
     : undefined;
   const app = createSlackApp(config, {
     analyzer: fixtureAnalyzer,
@@ -55,7 +49,7 @@ async function start(): Promise<void> {
       clearTimeout(deadline);
     }
   };
-  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.once(signal, () => {
       void stop().catch(() => {
         process.exitCode = 1;
@@ -65,18 +59,18 @@ async function start(): Promise<void> {
   await app.start();
   logger.info(
     {
-      analysisMode: "fixture",
-      storage: "memory",
+      analysisMode: 'fixture',
+      storage: 'memory',
       audioEnabled: Boolean(client),
     },
-    "DRII connected. Decision cards contain labeled sample data; live reasoning is not wired yet.",
+    'DRII connected. Decision cards contain labeled sample data; live reasoning is not wired yet.',
   );
 }
 
 void start().catch(() => {
   logger.error(
-    { code: "STARTUP_FAILED" },
-    "DRII could not connect. Check Slack tokens, app installation, and network access.",
+    { code: 'STARTUP_FAILED' },
+    'DRII could not connect. Check Slack tokens, app installation, and network access.',
   );
   process.exitCode = 1;
 });

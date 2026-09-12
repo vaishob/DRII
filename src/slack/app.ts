@@ -5,7 +5,7 @@ import {
   ACTION_SHOW_EVIDENCE,
   ACTION_SHOW_TRANSCRIPT,
 } from "../config/limits.js";
-import type { Config } from "../config/index.js";
+import type { SlackConfig as Config } from "../config/index.js";
 import type { DecisionAnalyzer, Transcriber } from "../contracts/intake.js";
 import { createSlackPort } from "./adapter.js";
 import { createController } from "./controller.js";

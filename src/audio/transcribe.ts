@@ -5,6 +5,7 @@ import {
   MAX_TRANSCRIPT_CHARS,
   SDK_RETRIES,
   TRANSCRIPTION_MODEL,
+  MAX_AUDIO_DURATION_SECONDS,
   TRANSCRIPTION_TIMEOUT_MS,
 } from "../config/limits.js";
 import type { Transcriber } from "../contracts/intake.js";
@@ -26,7 +27,10 @@ const diarizedSchema = z.object({
     .max(MAX_SEGMENTS),
 });
 
-export function createTranscriber(client?: Pick<OpenAI, "audio">): Transcriber {
+export function createTranscriber(
+  client?: Pick<OpenAI, "audio">,
+  model = TRANSCRIPTION_MODEL,
+): Transcriber {
   return {
     async transcribeMeeting(bytes, name) {
       if (!client)
@@ -38,13 +42,16 @@ export function createTranscriber(client?: Pick<OpenAI, "audio">): Transcriber {
         const result = await client.audio.transcriptions.create(
           {
             file: await toFile(bytes, name, { type: "audio/mpeg" }),
-            model: TRANSCRIPTION_MODEL,
+            model,
             response_format: "diarized_json",
             chunking_strategy: "auto",
           },
           { timeout: TRANSCRIPTION_TIMEOUT_MS, maxRetries: SDK_RETRIES },
         );
-        return diarizedSchema.parse(result).segments.map((segment, index) => ({
+        const segments = diarizedSchema.parse(result).segments;
+        if (segments.some((s) => s.end > MAX_AUDIO_DURATION_SECONDS))
+          throw new Error("Recording exceeds duration limit");
+        return segments.map((segment, index) => ({
           id: `segment-${index}`,
           text: segment.text,
           speakerLabel: segment.speaker ?? null,

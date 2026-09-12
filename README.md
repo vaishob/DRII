@@ -2,9 +2,9 @@
 
 DRII turns fragmented organizational context into evidence-backed decisions. It reviews a meeting, retrieves company evidence, challenges unsupported assumptions, asks a missing stakeholder, and records a human-approved decision in Slack.
 
-**Status:** the Slack transcript/MP3 intake and labeled fixture cards are implemented, alongside shared contracts, ClickHouse data adapters, synthetic inputs and retrieval commands. Slack still uses the fixture analyzer and temporary session store. Live reasoning, persistent Slack session integration, follow-up, approval, and real-workspace verification remain open; the complete flow below is the target MVP.
+**Status:** the implementation now includes structured extraction, evidence checking, red-team review, durable Slack follow-up and owner approval, assumption monitoring, and an optional room interface. Use `DRII_ANALYSIS_MODE=live` with configured accounts. Offline tests and scripted evaluations are separate from the live ClickHouse/OpenAI/Slack acceptance gates, which still need real credentials and a teammate rehearsal. See the [current workflow runbook](docs/workflow.md) and [verification record](docs/verification.md).
 
-## Run the first slice
+## Run and verify
 
 Use Node.js 24 and install the locked dependencies with `npm ci`.
 
@@ -14,11 +14,13 @@ npm test
 npm run lint
 npm run build
 npm run demo:offline
+npm run eval:offline
+npm run demo:room
 ```
 
 The offline demo uses local fixtures and fake Slack transport: no tokens, uploads, or paid API calls. For the real Slack connection, follow [Slack demo setup](docs/slack-demo.md), populate your own local `.env` from `.env.example`, then use `npm run dev` (or `npm run build` and `npm start`). Creating a Slack app and supplying credentials are manual setup steps; installing this repository does not connect it automatically.
 
-Integration adapters and the remaining #3/#8 acceptance work are documented in [the handoff](docs/slack-demo.md#integration-handoff).
+The full setup, Slack commands, room controls and remaining account checks are documented in the [workflow runbook](docs/workflow.md). The room rehearsal at `http://127.0.0.1:3180` is explicitly scripted and makes no external calls.
 
 ## Demo and MVP scope
 

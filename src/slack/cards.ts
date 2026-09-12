@@ -19,7 +19,7 @@ function section(text: string): Blocks[number] {
 }
 
 export const FIXTURE_NOTICE =
-  "UI DEMO — the sample decision below is not derived from your meeting. Company retrieval, red-team reasoning, and approval are not connected yet.";
+  "UI DEMO — the sample decision below is not derived from your meeting. Company retrieval, red-team reasoning, and approval are disabled in this fixture mode.";
 
 export function decisionCard(
   view: DecisionView,

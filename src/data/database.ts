@@ -2,7 +2,10 @@ import { ClickHouseLogLevel, createClient } from '@clickhouse/client';
 import { requireClickHouse, type Config } from '../config/index.js';
 
 export type TableName =
-  'drii_meetings_v1' | 'drii_decision_events_v1' | 'drii_sources_v1';
+  | 'drii_meetings_v1'
+  | 'drii_decision_events_v1'
+  | 'drii_sources_v1'
+  | 'drii_records_v1';
 export interface Database {
   query(sql: string, parameters?: Record<string, unknown>): Promise<unknown[]>;
   command(sql: string, parameters?: Record<string, unknown>): Promise<void>;

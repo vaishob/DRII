@@ -6,6 +6,8 @@ import { DecisionEventSchema } from '../../src/contracts/index.js';
 import { createDatabase } from '../../src/data/database.js';
 import { ClickHouseDecisionStore } from '../../src/data/decisions.js';
 import { setupSchema } from '../../src/data/schema.js';
+import { ClickHouseRecords } from '../../src/data/records.js';
+import { z } from 'zod';
 
 // Explicitly opt in; these tests append synthetic records to a unique workspace.
 describe.skipIf(process.env.DRII_LIVE_TESTS !== '1')(
@@ -49,6 +51,12 @@ describe.skipIf(process.env.DRII_LIVE_TESTS !== '1')(
       try {
         await setupSchema(db);
         const store = new ClickHouseDecisionStore(db);
+        await new ClickHouseRecords(db).put(
+          workspaceId,
+          'slack-receipt',
+          'event-1',
+          { messageTs: '100.1', delivered: true },
+        );
         await store.appendDecisionEvent(approval);
         await store.appendDecisionEvent(event);
         await store.appendDecisionEvent(approval);
@@ -58,6 +66,14 @@ describe.skipIf(process.env.DRII_LIVE_TESTS !== '1')(
       const reconnected = createDatabase(config);
       try {
         const store = new ClickHouseDecisionStore(reconnected);
+        expect(
+          await new ClickHouseRecords(reconnected).get(
+            workspaceId,
+            'slack-receipt',
+            'event-1',
+            z.object({ messageTs: z.string(), delivered: z.boolean() }),
+          ),
+        ).toEqual({ messageTs: '100.1', delivered: true });
         expect(await store.getDecision(workspaceId, event.decisionId)).toEqual(
           approval.decision,
         );

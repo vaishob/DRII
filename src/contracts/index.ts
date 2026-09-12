@@ -363,7 +363,32 @@ export const DecisionEventSchema = z
       e.meetingId === e.decision.meetingId &&
       e.revision === e.decision.revision,
     'Event envelope must match decision snapshot',
-  );
+  )
+  .superRefine((event, ctx) => {
+    const states: Record<string, readonly DecisionState[]> = {
+      RECEIVED: ['RECEIVED'],
+      ANALYSIS_STARTED: ['ANALYZING'],
+      RETRIED: ['ANALYZING'],
+      INPUT_REQUESTED: ['NEEDS_INPUT'],
+      REVIEW_READY: ['READY_FOR_REVIEW'],
+      APPROVED: ['APPROVED'],
+      FAILED: ['FAILED'],
+      EVIDENCE_ADDED: ['ANALYZING', 'NEEDS_INPUT', 'READY_FOR_REVIEW'],
+    };
+    if (!states[event.eventType]?.includes(event.decision.state))
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Event type must match the decision state',
+      });
+    if (
+      event.eventType === 'APPROVED' &&
+      event.actor?.actorId !== event.decision.approval?.actor.actorId
+    )
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Approval event must identify the approving actor',
+      });
+  });
 export type DecisionEvent = z.infer<typeof DecisionEventSchema>;
 
 export const EvidenceScopeSchema = z

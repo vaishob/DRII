@@ -21,7 +21,12 @@ describe.skipIf(process.env.DRII_LIVE_TESTS !== '1')(
           workspaceId,
         ),
       ) as unknown;
-      const event = DecisionEventSchema.parse(input);
+      const parsed = DecisionEventSchema.parse(input);
+      const event = DecisionEventSchema.parse({
+        ...parsed,
+        eventType: 'REVIEW_READY',
+        decision: { ...parsed.decision, state: 'READY_FOR_REVIEW' },
+      });
       const approval = DecisionEventSchema.parse({
         ...event,
         revision: 2,

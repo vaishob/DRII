@@ -4,6 +4,14 @@ import * as contracts from '../src/contracts/index.js';
 import { loadConfig, requireClickHouse } from '../src/config/index.js';
 
 describe('version 1 contracts', () => {
+  it('rejects event labels that contradict their snapshot state', () => {
+    expect(
+      contracts.DecisionEventSchema.safeParse({
+        ...examples.DecisionEvent,
+        eventType: 'APPROVED',
+      }).success,
+    ).toBe(false);
+  });
   it('validates every published boundary example', () => {
     expect(contracts.MeetingSchema.parse(examples.Meeting)).toEqual(
       examples.Meeting,

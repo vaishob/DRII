@@ -3,6 +3,10 @@ import type { Database } from './database.js';
 // Append-only MergeTree tables. Logical uniqueness comes from reads and stable
 // event/revision IDs, never from background merges or insert deduplication.
 export const SCHEMA_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS drii_records_v1 (
+    workspace_id String, namespace String, record_key String,
+    revision UInt64, payload String
+  ) ENGINE = MergeTree ORDER BY (workspace_id, namespace, record_key, revision)`,
   `CREATE TABLE IF NOT EXISTS drii_meetings_v1 (
     workspace_id String, meeting_id String, revision UInt32,
     created_at_ms UInt64, payload String

@@ -1,0 +1,8 @@
+{
+  "synthetic": true,
+  "label": "SIMULATED: seven days later; no actual monitoring interval is claimed",
+  "asOf": "2026-09-19T09:00:00.000Z",
+  "sourceId": "support-capacity",
+  "metric": { "name": "available_agents", "value": 1, "unit": "people" },
+  "scenario": "An approved pilot expected at least two agents. One is now available. Record a review-needed event and leave the approved decision unchanged."
+}

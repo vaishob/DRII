@@ -1,0 +1,41 @@
+{
+  "name": "drii",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "node --watch --env-file=.env --import tsx src/index.ts",
+    "start": "node --env-file=.env dist/index.js",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src tests scripts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "demo:offline": "tsx scripts/demo-offline.ts"
+  },
+  "dependencies": {
+    "@slack/bolt": "^5.1.0",
+    "@slack/types": "^3.1.0",
+    "@slack/web-api": "^8.1.1",
+    "openai": "^7.15.0",
+    "pino": "^10.3.1",
+    "zod": "^4.6.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.13.4",
+    "eslint": "^10.10.0",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^5.0.0"
+  },
+  "optionalDependencies": {
+    "@rolldown/binding-darwin-x64": "^1.2.8"
+  }
+}

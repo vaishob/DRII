@@ -4,6 +4,17 @@ DRII turns fragmented organizational context into evidence-backed decisions. It 
 
 **Status:** the implementation now includes structured extraction, evidence checking, red-team review, durable Slack follow-up and owner approval, assumption monitoring, and an optional room interface. Use `DRII_ANALYSIS_MODE=live` with configured accounts. Offline tests and scripted evaluations are separate from the live ClickHouse/OpenAI/Slack acceptance gates, which still need real credentials and a teammate rehearsal. See the [current workflow runbook](docs/workflow.md) and [verification record](docs/verification.md).
 
+## Hosted browser demo — no installation
+
+Open **[drii-demo.vercel.app](https://drii-demo.vercel.app)** for the presentation. No terminal or local server is required.
+
+1. Click **Load sample transcript**, then **Add finalized text**.
+2. Click **Review current discussion** to show the contradiction between the meeting's claim and the synthetic company evidence.
+3. Expand **Inspect exact evidence and provenance** to show the sources.
+4. Refresh to restore the transcript and review. Click **New session** to reset the visible demo for your next presentation.
+
+This is the scripted launch scenario, using the shared decision workflow and synthetic fixtures. It does not perform live AI analysis, microphone transcription, Slack messages, or approval. Each browser keeps its own transcript and decision in local storage; clearing site data removes them. For local preview and redeployment instructions, see [hosted demo setup](docs/hosted-demo.md).
+
 ## Fast offline demo on Windows
 
 The offline demo needs no `.env`, API keys, Slack workspace, ClickHouse account, uploads, or paid calls. It uses clearly labeled scripted fixtures.

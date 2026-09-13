@@ -108,6 +108,10 @@ describe('scoped evidence retrieval', () => {
       { ...source, projectId: 'private' },
       { ...source, visibility: 'RESTRICTED' },
       { ...source, availableAt: '2027-01-01T00:00:00.000Z' },
+      {
+        ...source,
+        metrics: [{ ...source.metrics[0], measuredAt: '2027-01-01T00:00:00Z' }],
+      },
     ]) {
       vi.mocked(db.query).mockResolvedValue([
         { ...row, payload: JSON.stringify(bad) },

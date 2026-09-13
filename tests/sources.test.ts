@@ -77,6 +77,31 @@ describe('synthetic company inputs', () => {
   });
 });
 describe('source ingestion', () => {
+  it('rejects stored sources whose payload does not match the scoped read', async () => {
+    const { db, store } = adapters();
+    const source = SourceSchema.parse(documents[0]);
+    for (const bad of [
+      { ...source, sourceId: 'another-source' },
+      { ...source, workspaceId: 'another-workspace' },
+      { ...source, projectId: 'another-project' },
+      { ...source, visibility: 'RESTRICTED' },
+      { ...source, availableAt: '2027-01-01T00:00:00Z' },
+      {
+        ...source,
+        metrics: [{ ...source.metrics[0], measuredAt: '2027-01-01T00:00:00Z' }],
+      },
+    ]) {
+      vi.mocked(db.query).mockResolvedValue([{ payload: JSON.stringify(bad) }]);
+      await expect(
+        store.getSource(
+          source.workspaceId,
+          source.projectId,
+          source.sourceId,
+          '2026-09-12T08:00:00Z',
+        ),
+      ).rejects.toThrow('requested scope and date');
+    }
+  });
   it('binds metric names and returns a dated structured value', async () => {
     const { db, store } = adapters();
     vi.mocked(db.query).mockResolvedValue([

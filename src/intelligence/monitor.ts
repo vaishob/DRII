@@ -3,6 +3,7 @@ import type { Actor, Decision, Source } from '../contracts/index.js';
 import type { SourceStore } from '../contracts/services.js';
 import type { Records } from '../data/records.js';
 import { DecisionQueue } from '../data/queue.js';
+import { latestMetric } from '../data/metrics.js';
 import { stableId, WorkflowError } from './workflow.js';
 
 export const REVIEW_COOLDOWN_MS = 60_000;
@@ -86,15 +87,22 @@ export class AssumptionMonitor {
           ),
         );
       const source = sourceId ? sourceCache.get(sourceId) : null;
-      const metric = source?.metrics.find(
-        (m) =>
-          m.name === assumption.metric?.name &&
-          m.unit === assumption.metric.unit &&
-          Date.parse(m.measuredAt) <= Date.parse(asOf),
-      );
-      const before = d.evidence
-        .find((e) => e.sourceId === sourceId)
-        ?.metrics.find((m) => m.name === assumption.metric?.name);
+      const current =
+        source && assumption.metric
+          ? latestMetric(source.metrics, assumption.metric.name, asOf)
+          : null;
+      const metric = current?.unit === assumption.metric?.unit ? current : null;
+      const original = assumption.metric
+        ? latestMetric(
+            d.evidence
+              .filter((e) => e.sourceId === sourceId)
+              .flatMap((e) => e.metrics),
+            assumption.metric.name,
+            d.approval?.approvedAt ?? d.createdAt,
+          )
+        : null;
+      const before =
+        original?.unit === assumption.metric?.unit ? original : null;
       let status: Observation['status'] = 'UNKNOWN';
       if (metric && assumption.metric)
         status = conditionHolds(
@@ -117,7 +125,7 @@ export class AssumptionMonitor {
         assumptionId: assumption.assumptionId,
         assumption: assumption.text,
         sourceId,
-        sourceTime: metric?.measuredAt ?? source?.updatedAt ?? null,
+        sourceTime: current?.measuredAt ?? source?.updatedAt ?? null,
         previousValue: before?.value ?? null,
         value: metric?.value ?? null,
         unit: assumption.metric?.unit ?? null,

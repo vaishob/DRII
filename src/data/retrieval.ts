@@ -11,7 +11,7 @@ import {
 import type { EvidenceRetriever } from '../contracts/services.js';
 import { VectorSchema, type Embedder } from './chunks.js';
 import type { Database } from './database.js';
-import { CURRENT_SOURCES_SQL } from './sources.js';
+import { CURRENT_SOURCES_SQL, sourceMatchesScope } from './sources.js';
 
 export const DEFAULT_MIN_RELEVANCE = 0.3;
 export const MAX_QUERY_CHARACTERS = 2_000;
@@ -106,11 +106,14 @@ export class ClickHouseEvidenceRetriever implements EvidenceRetriever {
         const row = RowSchema.parse(value);
         const source = SourceSchema.parse(JSON.parse(row.payload));
         if (
-          source.workspaceId !== scope.workspaceId ||
-          source.projectId !== scope.projectId ||
-          source.visibility !== 'WORKSPACE' ||
-          Date.parse(source.availableAt) > parameters.asOf ||
-          Date.parse(source.updatedAt) > parameters.asOf ||
+          !sourceMatchesScope(
+            source,
+            scope.workspaceId,
+            scope.projectId,
+            scope.asOf,
+          ) ||
+          (parameters.sourceIds.length > 0 &&
+            !parameters.sourceIds.includes(source.sourceId)) ||
           !source.content.includes(row.excerpt)
         )
           throw new Error('Out-of-scope or invalid stored source');

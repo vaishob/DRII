@@ -13,6 +13,7 @@ import { ClickHouseSourceStore } from '../../src/data/sources.js';
 import { ClickHouseEvidenceRetriever } from '../../src/data/retrieval.js';
 import { setupSchema } from '../../src/data/schema.js';
 import { OpenAIEmbedder } from '../../src/data/embeddings.js';
+import { importSources } from '../../src/data/import.js';
 
 // These vectors test real SQL deterministically. They are never a demo fallback.
 const fixedEmbedder: Embedder = {
@@ -140,6 +141,58 @@ describe.skipIf(process.env.DRII_LIVE_TESTS !== '1')(
             scope.asOf,
           ),
         ).toBeNull();
+        const imported = SourceSchema.parse({
+          ...sources[0],
+          sourceId: 'imported-readiness',
+          synthetic: false,
+          title: 'Imported engineering readiness',
+          url: 'https://example.org/engineering-readiness',
+          metrics: [
+            {
+              name: 'blocking_bugs',
+              value: 4,
+              unit: 'bugs',
+              measuredAt: '2026-09-11T07:00:00Z',
+            },
+            {
+              name: 'blocking_bugs',
+              value: 1,
+              unit: 'bugs',
+              measuredAt: '2026-09-12T07:00:00Z',
+            },
+          ],
+        });
+        await importSources(
+          [imported],
+          { workspaceId, projectId: scope.projectId },
+          store,
+        );
+        await importSources(
+          [imported],
+          { workspaceId, projectId: scope.projectId },
+          store,
+        );
+        expect(
+          await store.getMetric(
+            workspaceId,
+            scope.projectId,
+            imported.sourceId,
+            'blocking_bugs',
+            scope.asOf,
+          ),
+        ).toMatchObject({ value: 1 });
+        expect(
+          (
+            await retriever.retrieveEvidence('readiness', {
+              ...scope,
+              sourceIds: [imported.sourceId],
+            })
+          ).evidence[0],
+        ).toMatchObject({
+          synthetic: false,
+          sourceUrl: imported.url,
+          sourceTitle: imported.title,
+        });
       } finally {
         await db.close();
       }

@@ -16,6 +16,53 @@ const RowSchema = z.object({
   payload: z.string(),
   embedding_model: z.string().optional(),
 });
+const MAX_SOURCE_REVISION = 4_294_967_295;
+export function validateSourceForIngestion(input: Source): Source {
+  const source = SourceSchema.parse(input);
+  const availableAt = Date.parse(source.availableAt);
+  if (
+    source.revision > MAX_SOURCE_REVISION ||
+    Date.parse(source.createdAt) < 0 ||
+    Date.parse(source.updatedAt) < 0 ||
+    Date.parse(source.updatedAt) > availableAt ||
+    source.metrics.some(
+      (m) =>
+        Date.parse(m.measuredAt) < 0 || Date.parse(m.measuredAt) > availableAt,
+    )
+  )
+    throw new Error(
+      'Source dates and revision must fit storage; metric dates cannot follow availability',
+    );
+  const measurements = new Set<string>();
+  for (const metric of source.metrics) {
+    const key = JSON.stringify([metric.name, Date.parse(metric.measuredAt)]);
+    if (measurements.has(key))
+      throw new Error(
+        'A metric must have one value and unit per measurement time',
+      );
+    measurements.add(key);
+  }
+  // Validate every document before any embeddings or storage writes occur.
+  chunkSource(source);
+  return source;
+}
+
+export function sourceMatchesScope(
+  source: Source,
+  workspaceId: string,
+  projectId: string,
+  asOf: string,
+): boolean {
+  const time = Date.parse(asOf);
+  return (
+    source.workspaceId === workspaceId &&
+    source.projectId === projectId &&
+    source.visibility === 'WORKSPACE' &&
+    Date.parse(source.availableAt) <= time &&
+    Date.parse(source.updatedAt) <= time &&
+    source.metrics.every((m) => Date.parse(m.measuredAt) <= time)
+  );
+}
 // Select the logical current version BEFORE visibility or vector ranking.
 // A newer restricted revision must hide an older workspace-visible revision.
 export const CURRENT_SOURCES_SQL = `
@@ -37,16 +84,7 @@ export class ClickHouseSourceStore implements SourceStore {
     private readonly embedder: Embedder,
   ) {}
   async ingestSource(input: Source): Promise<void> {
-    const source = SourceSchema.parse(input);
-    if (
-      Date.parse(source.updatedAt) > Date.parse(source.availableAt) ||
-      source.metrics.some(
-        (m) => Date.parse(m.measuredAt) > Date.parse(source.availableAt),
-      )
-    )
-      throw new Error(
-        'Source and metric dates cannot be after source availability',
-      );
+    const source = validateSourceForIngestion(input);
     await writeQueue.run(
       source.workspaceId,
       JSON.stringify([source.projectId, source.sourceId]),
@@ -73,7 +111,7 @@ export class ClickHouseSourceStore implements SourceStore {
         }
         if (existing.length) return;
         const chunks = chunkSource(source);
-        // Restricted demo documents are stored but never sent to the embedding API.
+        // Restricted documents are stored but never sent to the embedding API.
         const vectors =
           source.visibility === 'WORKSPACE'
             ? await this.embedder.embed(chunks.map((c) => c.excerpt))
@@ -130,9 +168,18 @@ export class ClickHouseSourceStore implements SourceStore {
         asOf: Date.parse(TimestampSchema.parse(asOf)),
       },
     );
-    return rows[0]
-      ? SourceSchema.parse(JSON.parse(RowSchema.parse(rows[0]).payload))
-      : null;
+    if (!rows[0]) return null;
+    const source = SourceSchema.parse(
+      JSON.parse(RowSchema.parse(rows[0]).payload),
+    );
+    if (
+      source.sourceId !== sourceId ||
+      !sourceMatchesScope(source, workspaceId, projectId, asOf)
+    )
+      throw new Error(
+        'Stored source does not match the requested scope and date',
+      );
+    return source;
   }
 
   async getMetric(

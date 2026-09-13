@@ -12,7 +12,13 @@ import {
   stableId,
   WorkflowError,
 } from "../intelligence/workflow.js";
-import { liveCard, section } from "./live-cards.js";
+import {
+  detailBatches,
+  evidenceDetails,
+  liveCard,
+  reviewDetails,
+} from "./live-cards.js";
+import { IntakeError } from "./errors.js";
 import {
   parseCommand,
   resolveInput,
@@ -30,6 +36,7 @@ const RunSchema = z.object({
   messageTs: z.string().nullable(),
   meeting: MeetingSchema.nullable(),
   phase: z.enum(["CLAIMED", "READY", "FAILED"]),
+  lastOpenMentionTs: z.string().optional(),
 });
 type LiveRun = z.infer<typeof RunSchema>;
 const Action = z.object({
@@ -64,6 +71,12 @@ const Action = z.object({
 const ButtonValue = z.object({
   id: z.string(),
   revision: z.number().int().nonnegative(),
+});
+const QuestionRoute = z.object({ id: z.string() });
+const Delivery = z.object({
+  attempted: z.boolean(),
+  messageTs: z.string().nullable().optional(),
+  retryId: z.string().optional(),
 });
 export interface MonitoringPort {
   review(d: Decision): Promise<string>;
@@ -102,18 +115,36 @@ export class LiveController {
     );
   }
   private async display(run: LiveRun, decision: Decision) {
-    if (!run.messageTs)
-      throw new WorkflowError(
-        "The initial Slack delivery was interrupted. Start a new review with a new mention.",
+    await this.queue.run(run.workspace, `display:${run.id}`, async () => {
+      // Re-read inside the delivery queue so a slow refresh cannot replace a newer approval card.
+      const current = await this.d.workflow.get(
+        run.workspace,
+        decision.decisionId,
       );
-    await this.d.slack.update(
-      run.channel,
-      run.messageTs,
-      `DRII: ${decision.state}`,
-      liveCard(decision),
-    );
-    run.phase = "READY";
-    await this.save(run);
+      await this.indexQuestions(run, current);
+      if (!run.messageTs)
+        throw new WorkflowError(
+          "The initial Slack delivery was interrupted. Start a new review with a new mention.",
+        );
+      await this.d.slack.update(
+        run.channel,
+        run.messageTs,
+        `DRII: ${current.state}`,
+        liveCard(current),
+      );
+      run.phase = "READY";
+      await this.save(run);
+    });
+  }
+  private async indexQuestions(run: LiveRun, decision: Decision) {
+    // Index every question separately: several decisions may share one Slack thread.
+    for (const question of decision.followUps)
+      await this.d.records.put(
+        run.workspace,
+        "slack-question",
+        `${run.channel}:${run.thread}:${question.questionId}`,
+        { id: run.id },
+      );
   }
   private async tell(
     user: string,
@@ -122,6 +153,26 @@ export class LiveController {
     blocks?: Blocks,
   ) {
     await this.d.slack.ephemeral(this.d.channel, user, thread, text, blocks);
+  }
+  private async indexSavedDecision(
+    run: LiveRun,
+    decision: Decision,
+    user: string,
+  ) {
+    if (decision.state !== "APPROVED") return;
+    try {
+      await this.d.workflow.indexApprovedDecision(decision);
+    } catch {
+      this.d.logger.warn(
+        { code: "DECISION_CONTEXT_INDEX_PENDING" },
+        "Approved decision saved; context indexing pending",
+      );
+      await this.tell(
+        user,
+        run.thread,
+        "Decision saved and approved; context indexing is pending. Reopen this decision to retry. The saved approval is unchanged.",
+      );
+    }
   }
   private actor(user: string): Actor {
     return user === this.d.owner.actorId
@@ -142,7 +193,9 @@ export class LiveController {
       thread,
       error instanceof WorkflowError
         ? error.message
-        : "The operation failed. Refresh the decision and retry. No successful approval is implied.",
+        : error instanceof IntakeError
+          ? error.userMessage
+          : "The operation failed. Refresh the decision and retry. No successful approval is implied.",
     );
   }
   async handleMention(mention: Mention, botId: string) {
@@ -162,6 +215,8 @@ export class LiveController {
           mention.workspaceId,
           open[1]!,
         );
+        if (decision.projectId !== this.d.project)
+          throw new WorkflowError("Decision unavailable in this project.");
         const existing = await this.d.records.get(
           mention.workspaceId,
           "slack-run",
@@ -169,7 +224,56 @@ export class LiveController {
           RunSchema,
         );
         if (existing) {
-          await this.display(existing, decision);
+          await this.queue.run(
+            mention.workspaceId,
+            decision.decisionId,
+            async () => {
+              const run = await this.run(
+                mention.workspaceId,
+                decision.decisionId,
+              );
+              // A new explicit open may recover an uncertain initial delivery. Slack redelivery of that same command must not repost.
+              if (!run.messageTs && run.lastOpenMentionTs !== mention.ts) {
+                run.lastOpenMentionTs = mention.ts;
+                await this.save(run);
+                try {
+                  run.messageTs = await this.d.slack.post(
+                    run.channel,
+                    run.thread,
+                    `DRII: ${decision.state}. Recovered saved review; an earlier card may remain after interrupted delivery.`,
+                    liveCard(decision),
+                  );
+                  await this.save(run);
+                  await this.d.records.put(
+                    run.workspace,
+                    "slack-thread",
+                    `${run.channel}:${run.thread}`,
+                    { id: run.id },
+                  );
+                } catch {
+                  this.d.logger.warn(
+                    { code: "SAVED_CARD_DELIVERY_PENDING" },
+                    "Saved review is available; public card delivery remains pending.",
+                  );
+                }
+              }
+              if (run.messageTs) await this.display(run, decision);
+              await this.indexSavedDecision(run, decision, mention.userId);
+              if (
+                !run.messageTs ||
+                run.thread !== (mention.threadTs ?? mention.ts)
+              )
+                for (const blocks of detailBatches(reviewDetails(decision)))
+                  await this.tell(
+                    mention.userId,
+                    mention.threadTs ?? mention.ts,
+                    run.messageTs
+                      ? "Saved decision; its original review card was refreshed"
+                      : "Saved decision is available below. Public card delivery is pending; send a new @DRII open command to retry.",
+                    blocks,
+                  );
+            },
+          );
           return;
         }
         await this.queue.run(
@@ -197,8 +301,10 @@ export class LiveController {
                 decision.meetingId,
               ),
               phase: "CLAIMED",
+              lastOpenMentionTs: mention.ts,
             };
             await this.save(run);
+            await this.indexQuestions(run, decision);
             run.messageTs = await this.d.slack.post(
               run.channel,
               run.thread,
@@ -212,6 +318,7 @@ export class LiveController {
               `${run.channel}:${run.thread}`,
               { id: run.id },
             );
+            await this.indexSavedDecision(run, decision, mention.userId);
           },
         );
       } catch (error) {
@@ -367,6 +474,7 @@ export class LiveController {
       return;
     const action = a.actions[0]!;
     if (!action.value) return; // selectors carry state; only explicit buttons mutate.
+    let savedApproval: { run: LiveRun; decision: Decision } | null = null;
     try {
       const value = ButtonValue.parse(JSON.parse(action.value));
       const run = await this.run(a.team.id, value.id);
@@ -376,40 +484,43 @@ export class LiveController {
       const name = action.action_id.replace("drii_live_", "");
       const actor = this.actor(a.user.id);
       if (name === "evidence") {
-        const blocks = decision.evidence.map((e) =>
-          section(
-            `${e.synthetic ? "SYNTHETIC · " : ""}${e.sourceType} · ${e.sourceTitle}\n${e.excerpt}\n${e.sourceId} revision ${e.sourceRevision} · ${e.sourceDate}\n${e.sourceUrl}`,
-          ),
-        );
-        await this.tell(
-          a.user.id,
-          run.thread,
-          "Exact retrieved evidence",
-          blocks.length
-            ? blocks
-            : [
-                section(
-                  "No retrieved evidence. Missing evidence is not proof of falsehood.",
-                ),
-              ],
-        );
+        for (const blocks of detailBatches(evidenceDetails(decision)))
+          await this.tell(
+            a.user.id,
+            run.thread,
+            `Evidence for ${decision.title}, revision ${decision.revision}`,
+            blocks,
+          );
+        return;
+      }
+      if (name === "details") {
+        for (const blocks of detailBatches(reviewDetails(decision)))
+          await this.tell(
+            a.user.id,
+            run.thread,
+            `Full review ${decision.decisionId}, revision ${decision.revision}`,
+            blocks,
+          );
         return;
       }
       if (name === "changes") {
         const meeting = await this.d.workflow.store.getMeeting(
           run.workspace,
-          run.id,
+          decision.meetingId,
         );
-        await this.tell(
-          a.user.id,
-          run.thread,
-          `Owner: correct a transcript with @DRII correct ${run.id} <segment-id> <corrected text>, map a speaker with @DRII map ${run.id} <segment-id> <@person>, then re-review.\n${
-            meeting?.segments
-              .map((s) => `${s.segmentId}: ${s.text}`)
-              .join("\n")
-              .slice(0, 2400) ?? ""
-          }`,
-        );
+        for (const blocks of detailBatches([
+          `Owner: correct a transcript with @DRII correct ${run.id} <segment-id> <corrected text>, or map a speaker with @DRII map ${run.id} <segment-id> <@person>. A correction triggers a fresh review.`,
+          ...(meeting?.segments.map(
+            (s) =>
+              `Transcript ${s.segmentId} · ${s.speaker?.displayName ?? s.speakerLabel ?? "unknown speaker"}\n${s.text}`,
+          ) ?? ["Stored transcript unavailable."]),
+        ]))
+          await this.tell(
+            a.user.id,
+            run.thread,
+            "Transcript and correction instructions",
+            blocks,
+          );
         return;
       }
       if (name === "challenge")
@@ -418,50 +529,117 @@ export class LiveController {
           run.id,
           value.revision,
         );
-      if (name === "request") {
+      if (name === "request" || name === "retry_request") {
         const target =
           a.state?.values[`recipient_${value.revision}`]?.drii_live_recipient
             ?.selected_user;
-        if (!target || !/^[UW][A-Z0-9]+$/.test(target))
+        if (actor.actorId !== decision.owner.actorId)
           throw new WorkflowError(
-            "Choose an actual recipient before sending the follow-up.",
+            "Only the configured decision owner can send a follow-up.",
           );
-        decision = await this.d.workflow.confirmFollowUp(
-          run.workspace,
-          run.id,
-          value.revision,
-          actor,
-          this.actor(target),
+        const confirmed = decision.followUps.find(
+          (f) => f.status === "CONFIRMED",
         );
-        await this.display(run, decision);
+        if (confirmed) {
+          const sameConfirmation =
+            name === "request" &&
+            decision.revision === value.revision + 1 &&
+            confirmed.target?.actorId === target;
+          if (
+            decision.state !== "NEEDS_INPUT" ||
+            (value.revision !== decision.revision && !sameConfirmation)
+          )
+            throw new WorkflowError(
+              "This review has changed. Refresh the card before acting.",
+            );
+        } else {
+          if (!target || !/^[UW][A-Z0-9]+$/.test(target))
+            throw new WorkflowError(
+              "Choose an actual recipient before sending the follow-up.",
+            );
+          decision = await this.d.workflow.confirmFollowUp(
+            run.workspace,
+            run.id,
+            value.revision,
+            actor,
+            this.actor(target),
+          );
+        }
         const question = decision.followUps.find(
           (f) => f.status === "CONFIRMED",
         )!;
+        await this.d.records.put(
+          run.workspace,
+          "slack-question",
+          `${run.channel}:${run.thread}:${question.questionId}`,
+          { id: run.id },
+        );
         // Persist the send attempt before the external side effect. An uncertain delivery is never automatically sent twice.
         const receipt = `${run.id}:${question.questionId}`;
-        if (
-          !(await this.d.records.get(
-            run.workspace,
-            "follow-up-send",
-            receipt,
-            z.object({ attempted: z.boolean() }),
-          ))
-        ) {
-          await this.d.records.put(run.workspace, "follow-up-send", receipt, {
-            attempted: true,
+        try {
+          await this.queue.run(run.workspace, `send:${receipt}`, async () => {
+            const delivery = await this.d.records.get(
+              run.workspace,
+              "follow-up-send",
+              receipt,
+              Delivery,
+            );
+            if (delivery?.messageTs) {
+              if (name === "retry_request")
+                await this.tell(
+                  a.user.id,
+                  run.thread,
+                  "This follow-up was already delivered. The selected recipient can answer using the same question ID in this thread.",
+                );
+              return;
+            }
+            const explicitRetry =
+              name === "retry_request" &&
+              action.action_ts &&
+              delivery?.retryId !== action.action_ts;
+            if (delivery && !explicitRetry) {
+              await this.tell(
+                a.user.id,
+                run.thread,
+                "The follow-up's delivery is uncertain. Check this thread before using Retry delivery. The selected recipient can already answer using the question ID shown on the card.",
+              );
+              return;
+            }
+            await this.d.records.put(run.workspace, "follow-up-send", receipt, {
+              attempted: true,
+              messageTs: null,
+              ...(action.action_ts ? { retryId: action.action_ts } : {}),
+            });
+            const text = `<@${question.target!.actorId}> DRII follow-up. Reply in this thread with ${question.questionId}: your answer.`;
+            const messageTs = await this.d.slack.post(
+              run.channel,
+              run.thread,
+              text,
+              [
+                { type: "section", text: { type: "mrkdwn", text } },
+                ...detailBatches([question.question])[0]!,
+              ],
+            );
+            await this.d.records.put(run.workspace, "follow-up-send", receipt, {
+              attempted: true,
+              messageTs,
+              ...(action.action_ts ? { retryId: action.action_ts } : {}),
+            });
           });
-          await this.d.slack.post(
-            run.channel,
-            run.thread,
-            `<@${target}> DRII follow-up ${question.questionId}: ${question.question}\nReply in this thread with ${question.questionId}: your answer.`,
-          );
+        } finally {
+          await this.display(run, decision);
         }
         return;
       }
       if (name === "approve") {
-        const option =
+        const selected =
           a.state?.values[`option_${value.revision}`]?.drii_live_option
             ?.selected_option?.value;
+        // New cards use bounded transport values; older cards may contain the raw ID.
+        const index = selected && /^option:(\d+)$/.exec(selected);
+        const option = index
+          ? decision.options[Number(index[1])]?.optionId
+          : selected;
         if (!option)
           throw new WorkflowError("Select the option you intend to approve.");
         decision = await this.d.workflow.approveDecision(
@@ -471,6 +649,7 @@ export class LiveController {
           actor,
           option,
         );
+        savedApproval = { run, decision };
       }
       if (["review", "mute", "dismiss"].includes(name)) {
         if (!this.d.monitor)
@@ -485,8 +664,25 @@ export class LiveController {
         return;
       }
       await this.display(run, decision);
+      if (name === "approve")
+        await this.indexSavedDecision(run, decision, a.user.id);
     } catch (error) {
-      await this.failure(a.user.id, a.message.ts, error);
+      if (savedApproval) {
+        this.d.logger.warn(
+          { code: "APPROVAL_CARD_DELIVERY_PENDING" },
+          "Approval saved; Slack card refresh pending",
+        );
+        await this.tell(
+          a.user.id,
+          savedApproval.run.thread,
+          `Approval was saved for decision ${savedApproval.decision.decisionId}, revision ${savedApproval.decision.revision}. The Slack card could not refresh. Use @DRII open ${savedApproval.decision.decisionId} to retrieve the saved record.`,
+        );
+        await this.indexSavedDecision(
+          savedApproval.run,
+          savedApproval.decision,
+          a.user.id,
+        );
+      } else await this.failure(a.user.id, a.message.ts, error);
     }
   }
   async handleReply(event: {
@@ -502,17 +698,28 @@ export class LiveController {
       event.channel !== this.d.channel
     )
       return;
-    const ref = await this.d.records.get(
+    const questionId = /^([^:\s]+):/.exec(event.text)?.[1];
+    if (!questionId) return;
+    const indexed = await this.d.records.get(
       event.workspace,
-      "slack-thread",
-      `${event.channel}:${event.thread}`,
-      z.object({ id: z.string() }),
+      "slack-question",
+      `${event.channel}:${event.thread}:${questionId}`,
+      QuestionRoute,
     );
+    const ref =
+      indexed ??
+      (await this.d.records.get(
+        event.workspace,
+        "slack-thread",
+        `${event.channel}:${event.thread}`,
+        QuestionRoute,
+      ));
     if (!ref) return;
     try {
       const current = await this.d.workflow.get(event.workspace, ref.id);
       const question = current.followUps.find(
         (f) =>
+          f.questionId === questionId &&
           (f.status === "CONFIRMED" ||
             (f.status === "ANSWERED" &&
               f.answer?.sourceId ===

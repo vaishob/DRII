@@ -87,3 +87,31 @@ it('detects replaced nonmetric evidence without declaring an unknown threshold v
   expect(observed[0]?.status).toBe('SUPERSEDED');
   expect(observed[0]?.value).toBeNull();
 });
+it('evaluates the latest measurement in unordered history and does not fall back after its unit changes', async () => {
+  const h = setup();
+  const older = { ...h.metric, value: 3, measuredAt: '2026-09-18T08:00:00Z' };
+  const current = { ...h.metric, value: 1, measuredAt: '2026-09-19T08:00:00Z' };
+  const future = { ...h.metric, value: 3, measuredAt: '2026-09-20T08:00:00Z' };
+  for (const metrics of [
+    [older, current, future],
+    [future, current, older],
+  ]) {
+    h.source.metrics = metrics;
+    const observed = await h.monitor.inspect(h.d, '2026-09-19T09:00:00Z');
+    expect(observed[0]).toMatchObject({
+      status: 'VIOLATED',
+      value: 1,
+      sourceTime: current.measuredAt,
+    });
+  }
+  current.unit = 'hours';
+  expect(
+    (await h.monitor.inspect(h.d, '2026-09-19T09:00:00Z'))[0],
+  ).toMatchObject({ status: 'UNKNOWN', value: null });
+});
+it('keeps contradictory measurements at the same time unknown instead of choosing arbitrary evidence', async () => {
+  const h = setup();
+  h.source.metrics = [h.metric, { ...h.metric, value: h.metric.value + 2 }];
+  const observed = await h.monitor.inspect(h.d, '2026-09-19T09:00:00Z');
+  expect(observed[0]).toMatchObject({ status: 'UNKNOWN', value: null });
+});

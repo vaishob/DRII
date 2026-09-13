@@ -1,5 +1,5 @@
 {
-  "date": "2026-09-12T09:14:48.957Z",
+  "date": "2026-09-13T03:27:33.960Z",
   "mode": "SCRIPTED_OFFLINE",
   "model": "SCRIPTED-OFFLINE-NOT-A-MODEL",
   "retrieval": "Explicit synthetic in-memory source adapter; not a ClickHouse test",
@@ -9,19 +9,19 @@
     {
       "name": "contradicted",
       "passed": true,
-      "elapsedMs": 20,
+      "elapsedMs": 18,
       "detail": "Schema, provenance and case assertions passed."
     },
     {
       "name": "supported-counterfactual",
       "passed": true,
-      "elapsedMs": 3,
+      "elapsedMs": 2,
       "detail": "Schema, provenance and case assertions passed."
     },
     {
       "name": "missing-evidence",
       "passed": true,
-      "elapsedMs": 2,
+      "elapsedMs": 1,
       "detail": "Schema, provenance and case assertions passed."
     },
     {
@@ -39,7 +39,7 @@
     {
       "name": "stale-source",
       "passed": true,
-      "elapsedMs": 2,
+      "elapsedMs": 4,
       "detail": "Schema, provenance and case assertions passed."
     },
     {
@@ -57,13 +57,13 @@
     {
       "name": "temporary-tool-failure",
       "passed": true,
-      "elapsedMs": 5,
+      "elapsedMs": 3,
       "detail": "Schema, provenance and case assertions passed."
     },
     {
       "name": "fabricated-citation",
       "passed": true,
-      "elapsedMs": 1,
+      "elapsedMs": 3,
       "detail": "Schema, provenance and case assertions passed."
     }
   ],

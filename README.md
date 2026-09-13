@@ -20,7 +20,7 @@ npm run demo:room
 
 The offline demo uses local fixtures and fake Slack transport: no tokens, uploads, or paid API calls. For the real Slack connection, follow [Slack demo setup](docs/slack-demo.md), populate your own local `.env` from `.env.example`, then use `npm run dev` (or `npm run build` and `npm start`). Creating a Slack app and supplying credentials are manual setup steps; installing this repository does not connect it automatically.
 
-The full setup, Slack commands, room controls and remaining account checks are documented in the [workflow runbook](docs/workflow.md). The room rehearsal at `http://127.0.0.1:3180` is explicitly scripted and makes no external calls.
+The full setup, Slack commands, room controls and remaining account checks are documented in the [workflow runbook](docs/workflow.md). Run `npm run doctor` to identify missing live configuration; use `npm run doctor -- --live` for service checks and small synthetic model/embedding calls. The [MVP gap audit](docs/mvp-readiness.md) maps the product brief to implemented behavior and outstanding acceptance checks. The room rehearsal at `http://127.0.0.1:3180` is explicitly scripted and makes no external calls.
 
 ## Demo and MVP scope
 
@@ -29,8 +29,8 @@ The full setup, Slack commands, room controls and remaining account checks are d
 3. DRII transcribes the recording and extracts the decision, options, priorities, and claims.
 4. It retrieves evidence from ClickHouse and publishes a Decision X-Ray with sources and a red-team objection.
 5. A participant confirms a targeted follow-up question; a teammate answers it in the thread.
-6. DRII updates the recommendation, explaining what changed. The decision owner approves an option.
-7. The decision, evidence, ordered actions, assumptions, and approval revision remain retrievable.
+6. DRII compares every option against the same sourced, unweighted criteria, updates the recommendation, and explains what changed. The owner approves the recommendation whose conditions and action plan were reviewed.
+7. The decision, evidence, ordered actions, assumptions, and approval revision remain retrievable. Approved choices become searchable context for later meetings; they do not establish that proposed actions were completed.
 
 A pasted transcript is the explicit transcription fallback. Synthetic company records are labeled as demo data. No separate upload website is required. Live microphone input, spoken interruptions, dedicated hardware, and later outcome monitoring are stretch work.
 
@@ -83,7 +83,7 @@ Slack audio / transcript / participant reply
 
 These are modules in one process, not three deployed microservices. Dependency injection allows local fixture adapters while teammates implement the real boundaries. The decision workflow accepts normalized data, not Slack SDK objects, so a later meeting plugin can reuse it.
 
-Module ownership (intelligence and data implementations are still to be connected):
+Module ownership (the three tracks are connected through the durable workflow):
 
 ```text
 src/

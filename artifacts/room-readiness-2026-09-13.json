@@ -1,0 +1,20 @@
+{
+  "date": "2026-09-13",
+  "mode": "SCRIPTED_OFFLINE",
+  "browser": "Chrome via agent-browser",
+  "origin": "http://127.0.0.1:3180",
+  "checks": {
+    "pageLoads": true,
+    "transcriptSubmission": true,
+    "scriptedContradictionRendered": true,
+    "exactEvidenceVisible": true,
+    "savedSessionRestoredAfterRefresh": true,
+    "savedReviewRestoredWithoutReviewRequest": true,
+    "restoredSegmentCount": 1,
+    "errorMessageAfterRestoration": "",
+    "horizontalOverflow": false,
+    "pageErrors": []
+  },
+  "screenshot": "room-readiness-2026-09-13-restored.png",
+  "limitations": "Synthetic model and in-memory data. No live Slack, ClickHouse, OpenAI, microphone, latency or accessibility certification is claimed. Source-change/cooldown behavior was separately tested in tests/room.test.ts."
+}

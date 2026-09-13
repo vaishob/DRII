@@ -1,11 +1,23 @@
-﻿# Verification record — 2026-09-12
+# Verification record — 2026-09-13
 
-## Actual results
+## Current MVP branch results — 2026-09-13
+
+Branch `feat/mvp-readiness` started from main at `58d70ab` (merged PR #19). Windows PowerShell and portable Node.js 24.21.0; no dependency changes.
+
+- `npm run verify` passed: TypeScript, **135 tests across 22 files**, ESLint, Prettier and production build. The full test run at 11:34 Singapore time took 15.52 seconds. After the final Slack rate-limit/startup guard and room message reset refinements, the 13 relevant lifecycle/readiness/runtime/room tests, typecheck, lint and build passed again.
+- `npm run eval:offline` passed **10/10** at 2026-09-13T03:27:33.960Z. [Current evaluation JSON](../artifacts/evaluation-offline.json) contains scripted results; it does not measure actual model quality or database retrieval.
+- `npm run demo:offline` passed with zero external calls and duplicate suppression. `npm run source:ingest -- fixtures/demo/sources.json --dry-run` validated **10 revisions / 9 logical sources** without provider requests.
+- Browser verification passed in Chrome: transcript submission, source-backed scripted review, complete source inspection, transcript **and saved review** restored on refresh without another review request, and no horizontal overflow or page errors. [Saved review after refresh](../artifacts/room-readiness-2026-09-13-restored.png) and the [browser check record](../artifacts/room-readiness-2026-09-13.json) capture the current result. The room unit test separately verifies refreshed source revisions after cooldown without additional speech. These runs used the explicitly scripted offline server.
+- `npm run doctor` correctly exited 1: the root `.env` is absent, live mode is unset, and ClickHouse/OpenAI/Slack settings and identity IDs are missing. It printed configuration field names without secrets and made no provider calls. Live doctor, integration tests, paid model evaluation, real Slack/audio and second-person rehearsal remain unrun.
+
+New regressions cover question-specific routing in shared threads, interrupted and uncertain follow-up delivery, recovery of a saved review whose first card failed, persisted approval during card/indexing outages, unknown-speaker priorities, complete shared criteria, direct reply citations, interrupted transcript corrections, recommendation-bound approval, approved-choice indexing, latest metric histories, imports, scoped source payloads and startup/shutdown cleanup. See the [MVP audit](mvp-readiness.md) and [updated runbook](workflow.md).
+
+## Historical baseline — 2026-09-12 (PR #19)
 
 Windows PowerShell; official portable Node.js 24.21.0; pinned package-lock.json. Main was pulled through `c106715` (merged PR #17) into `feat/complete-decision-workflow`.
 
 - `npm run verify` passed: TypeScript, **99 tests in 16 files**, ESLint, Prettier, and the production build. The final integrated test run started at 17:14 Singapore time and took 13.47 seconds. This is test duration, not product latency.
-- `npm run eval:offline` passed **10/10** at 2026-09-12T09:14:48.957Z. [Actual JSON results](../artifacts/evaluation-offline.json) record each case. Cases cover contradiction, supported counterfactual, missing evidence, no decision, document injection, source revisions, conflicting evidence, missing stakeholder, temporary retrieval failure/recovery, and fabricated citations. Responses/retrieval are explicitly scripted; this is not evidence of model quality.
+- `npm run eval:offline` passed **10/10** at 2026-09-12T09:14:48.957Z; the current JSON artifact supersedes that older run. Cases cover contradiction, supported counterfactual, missing evidence, no decision, document injection, source revisions, conflicting evidence, missing stakeholder, temporary retrieval failure/recovery, and fabricated citations. Responses/retrieval are explicitly scripted; this is not evidence of model quality.
 - `npm run demo:offline` passed with zero external calls and duplicate intake suppression. Full workflow controller tests separately cover targeted replies, wrong actors, stale approvals, duplicates, new controller instances, approval immutability, and recovery after an interrupted reply write.
 - Real OpenAI SDK parsing is exercised with mocked HTTP: valid structured responses, bounded repair and sanitized provider errors. No paid model evaluation was run.
 - Browser checks in headless Chrome passed: transcript submission, contradiction rendering, exact evidence inspection, refresh restoration, one failed request followed by exactly one stored segment, no repeated mute action after a lost response, and retry of a retained already-transcribed chunk. The latter uses synthetic text; it does not verify microphone/STT access. No browser errors appeared. The final axe 4.12.1 scan of the rendered review had zero violations, 34 passes and no incomplete checks; the earlier mobile check had no horizontal overflow. [Accessibility JSON](../artifacts/room-accessibility.json) and the [final screenshot](../artifacts/room-final.png) are saved.

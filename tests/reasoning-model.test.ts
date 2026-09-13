@@ -1,8 +1,42 @@
 import { expect, it, vi } from 'vitest';
 import OpenAI from 'openai';
+import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
 import { loadConfig } from '../src/config/index.js';
 import { OpenAIReasoningModel } from '../src/intelligence/model.js';
+import {
+  MAX_REASONING_OUTPUT_TOKENS,
+  ReviewOutputSchema,
+  ReviewSchema,
+} from '../src/intelligence/schema.js';
+
+it('keeps old persisted reviews readable while requiring the shared criterion matrix from new model calls', () => {
+  const legacy = {
+    checks: [],
+    objection: {
+      text: 'No source supplied.',
+      citations: [],
+      wouldChangeAssessment: 'Supply source evidence.',
+    },
+    additionalQueries: [],
+    comparison: [],
+    recommendation: { optionId: null, conditions: [] },
+    question: null,
+    actions: [],
+    assumptions: [],
+  };
+  expect(ReviewSchema.safeParse(legacy).success).toBe(true);
+  expect(ReviewOutputSchema.safeParse(legacy).success).toBe(false);
+  expect(
+    ReviewOutputSchema.safeParse({ ...legacy, criterionAssessments: [] })
+      .success,
+  ).toBe(true);
+  const format = zodTextFormat(ReviewOutputSchema, 'evidence_review');
+  expect(format.strict).toBe(true);
+  expect(format.schema).toMatchObject({
+    required: expect.arrayContaining(['criterionAssessments']),
+  });
+});
 
 it('uses the real SDK structured-output parser and repairs malformed output within a fixed budget', async () => {
   let calls = 0;
@@ -12,10 +46,12 @@ it('uses the real SDK structured-output parser and repairs malformed output with
       store: boolean;
       text: { format: { type: string } };
       instructions: string;
+      max_output_tokens: number;
     };
     expect(request.store).toBe(false);
     expect(request.text.format.type).toBe('json_schema');
     expect(request.instructions).toContain('untrusted');
+    expect(request.max_output_tokens).toBe(MAX_REASONING_OUTPUT_TOKENS);
     return new Response(
       JSON.stringify({
         id: 'resp_test',

@@ -16,6 +16,10 @@ Generic searches return EMPTY for no permitted matches and do not disclose priva
 
 There is no result cache: a new query sees newly ingested evidence. Initial demo queries use the fixed 08:00 UTC cutoff; after-reply queries use 08:11 UTC. Seeding the reply cannot leak it into the historical initial query. Source timestamps indicate source availability, not today's clock.
 
+`source:ingest` validates and imports organization documents from JSON, with `--dry-run` for an entirely local preflight. `evidence:query` searches at the current time; `source:show` accepts an optional ISO timestamp and otherwise uses now. See the [import instructions](workflow.md#import-company-context). Stored source payloads are checked again for scope/date/visibility consistency before being returned. Metric histories use the latest eligible measurement, and a unit change remains unknown instead of falling back to an older value.
+
+Saved human approvals are indexed as `DECISION` sources, explicitly distinguished from verified facts and completed actions. Follow-up testimony is both persisted as a source and attached directly to the current review, so a selected stakeholder's answer cannot disappear because of similarity ranking. Synthetic provenance is retained. Indexing outages never undo approvals; reopening the saved decision retries that separate operation.
+
 Source URLs use stable `drii://workspace/project/sourceId` identifiers. These are application references, not public HTTP pages. For an inspectable source view, run `npm run source:show -- support-capacity`; Slack cards must use the source-view boundary or render the exact returned excerpt and metadata instead of treating a `drii://` reference as an implemented website. The source viewer applies the same scope/time/visibility filtering. It needs ClickHouse access but makes no model call.
 
 Retrieved content is untrusted. One support runbook deliberately includes an instruction-like sentence. The reasoning implementation must treat it as document data, never as approval or a tool instruction. The source store preserves the exact sentence so evaluation can check that boundary.

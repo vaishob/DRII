@@ -242,6 +242,15 @@ export class ScriptedModel implements ReasoningModel {
                 ? 'Engineering condition satisfied'
                 : 'Engineering condition unsatisfied',
         })),
+        criterionAssessments: input.extraction.priorities.flatMap((_p, i) =>
+          input.extraction.options.map((o) => ({
+            optionId: o.id,
+            criterionId: `criterion-${i + 1}`,
+            assessment:
+              'SCRIPTED OFFLINE: requires verification against the stated priority.',
+            citations: [],
+          })),
+        ),
         recommendation: {
           optionId: 'pilot',
           conditions: [

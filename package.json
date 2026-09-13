@@ -7,6 +7,9 @@
     "node": ">=24 <25"
   },
   "scripts": {
+    "doctor": "node --env-file-if-exists=.env --import tsx scripts/doctor.ts",
+    "source:ingest": "node --env-file-if-exists=.env --import tsx src/data/cli.ts ingest",
+    "evidence:query": "node --env-file-if-exists=.env --import tsx src/data/cli.ts query-current",
     "demo:assumptions": "node --env-file-if-exists=.env --import tsx scripts/demo-assumptions.ts",
     "eval:offline": "tsx scripts/evaluate.ts",
     "eval:model": "node --env-file-if-exists=.env --import tsx scripts/evaluate.ts --live-model",

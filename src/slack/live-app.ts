@@ -4,6 +4,11 @@ import type { SlackConfig } from "../config/index.js";
 import { createSlackPort } from "./adapter.js";
 import { LiveController, type LiveDependencies } from "./live-controller.js";
 import { LIVE_ACTIONS } from "./live-cards.js";
+import {
+  slackClientOptions,
+  slackSdkLogger,
+  withSlackLifecycle,
+} from "./lifecycle.js";
 
 const Mention = z.object({
   channel: z.string(),
@@ -25,6 +30,8 @@ export function createLiveSlackApp(
     appToken: config.SLACK_APP_TOKEN,
     socketMode: true,
     logLevel: LogLevel.WARN,
+    clientOptions: slackClientOptions(),
+    logger: slackSdkLogger(services.logger),
   });
   const controller = new LiveController({
     ...services,
@@ -88,5 +95,5 @@ export function createLiveSlackApp(
       "Slack request failed; check connectivity and refresh the decision.",
     );
   });
-  return app;
+  return withSlackLifecycle(app, config);
 }

@@ -11,6 +11,11 @@ import { createSlackPort } from "./adapter.js";
 import { createController } from "./controller.js";
 import type { SafeLogger } from "./ports.js";
 import type { RunStore } from "./run-store.js";
+import {
+  slackClientOptions,
+  slackSdkLogger,
+  withSlackLifecycle,
+} from "./lifecycle.js";
 
 const eventSchema = z.object({
   channel: z.string(),
@@ -35,6 +40,8 @@ export function createSlackApp(
     appToken: config.SLACK_APP_TOKEN,
     socketMode: true,
     logLevel: LogLevel.WARN,
+    clientOptions: slackClientOptions(),
+    logger: slackSdkLogger(services.logger),
   });
   const controller = createController({
     ...services,
@@ -72,5 +79,5 @@ export function createSlackApp(
       "Slack reported an application error; inspect configuration and connectivity",
     );
   });
-  return app;
+  return withSlackLifecycle(app, config);
 }

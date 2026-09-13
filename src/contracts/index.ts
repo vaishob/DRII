@@ -159,7 +159,7 @@ export const EvidenceSchema = z
     metrics: z.array(MetricSchema),
     relevance: z
       .object({
-        method: z.enum(['COSINE', 'KEYWORD']),
+        method: z.enum(['COSINE', 'KEYWORD', 'DIRECT']),
         score: z.number().finite(),
         model: z.string().nullable(),
       })
@@ -237,7 +237,7 @@ export const DecisionSchema = z
     priorities: z.array(
       z
         .object({
-          actor: ActorSchema,
+          actor: ActorSchema.nullable(),
           description: z.string().min(1),
           weight: z.number().nonnegative().nullable(),
           weightConfirmed: z.boolean(),

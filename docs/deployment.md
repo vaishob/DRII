@@ -81,7 +81,7 @@ Run only one app process with this concurrency model. ClickHouse has no transact
 
 Missing/placeholder `CLICKHOUSE_URL` produces a configuration message before a request. Connection, authentication, permissions, and request timeouts produce a sanitized ClickHouse error. Missing OpenAI configuration is explicit; embedding failures have a separate error code. Fix persistent configuration problems before retrying. Database failures must not be represented as unsupported claims or empty evidence.
 
-The data layer bounds source size, query length, request time, vector batch size, and result count. The workflow still needs bounded retries and user-visible recoverable FAILED states. `npm run dev` validates Slack credentials and starts the labeled fixture intake; without credentials it exits with sanitized configuration field names. `npm run demo:offline` exercises intake, duplicate suppression and the evidence button without network calls.
+The data layer bounds source size, query length, request time, vector batch size, and result count. The integrated workflow provides bounded model retries and recoverable FAILED states. `npm run dev` selects fixture/live mode from configuration; `npm run doctor` checks the complete live setup locally, and `npm run doctor -- --live` performs bounded service probes. Startup failures close acquired resources. `npm run demo:offline` exercises intake, duplicate suppression and the evidence button without network calls. Use the [current runbook](workflow.md) for imports, stakeholder delivery retries, approval and saved context recovery.
 
 ## Other deployment profiles and data flows
 

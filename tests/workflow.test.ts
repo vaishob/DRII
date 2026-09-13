@@ -8,6 +8,7 @@ import {
   type DecisionEvent,
   type Evidence,
   type Meeting,
+  type Source,
 } from '../src/contracts/index.js';
 import type {
   DecisionStore,
@@ -103,6 +104,21 @@ function review(answered = false): Review {
     comparison: [
       { optionId: 'pilot', assessment: 'Conditional on coverage' },
       { optionId: 'broad', assessment: 'Blocked' },
+    ],
+    criterionAssessments: [
+      {
+        optionId: 'pilot',
+        criterionId: 'criterion-1',
+        assessment: 'Support capacity requires verification.',
+        citations: [],
+      },
+      {
+        optionId: 'broad',
+        criterionId: 'criterion-1',
+        assessment:
+          'The broad scope exceeds the currently verified support capacity.',
+        citations: [],
+      },
     ],
     recommendation: {
       optionId: 'pilot',
@@ -235,6 +251,44 @@ function harness() {
 }
 
 describe('reasoning evidence boundaries', () => {
+  it('retrieves decision context even when a choice contains priorities but no factual claim', async () => {
+    const h = harness();
+    const prioritiesOnly = { ...extraction, claims: [] };
+    const assessment = { ...review(), checks: [] };
+    vi.spyOn(h.model, 'generate')
+      .mockResolvedValueOnce(prioritiesOnly)
+      .mockResolvedValueOnce(assessment)
+      .mockResolvedValueOnce(assessment);
+    const result = await h.workflow.analyzeDecision(meeting);
+    expect(result.state).toBe('NEEDS_INPUT');
+    expect(h.retriever.retrieveEvidence).toHaveBeenCalledWith(
+      extraction.question,
+      expect.objectContaining({
+        workspaceId: meeting.workspaceId,
+        projectId: meeting.projectId,
+      }),
+    );
+    expect(result.evidence).toHaveLength(1);
+  });
+  it('requires a complete unweighted option/criterion matrix and exact citations', () => {
+    const missing = review();
+    missing.criterionAssessments!.pop();
+    expect(() => validateReview(missing, extraction, [evidence(1)])).toThrow(
+      'every shared criterion',
+    );
+    const duplicate = review();
+    duplicate.criterionAssessments![1] = duplicate.criterionAssessments![0]!;
+    expect(() => validateReview(duplicate, extraction, [evidence(1)])).toThrow(
+      'duplicate',
+    );
+    const fabricated = review();
+    fabricated.criterionAssessments![0]!.citations = [
+      { evidenceId: 'qa-0', quote: 'Everyone agreed.' },
+    ];
+    expect(() => validateReview(fabricated, extraction, [evidence(1)])).toThrow(
+      'Fabricated citation',
+    );
+  });
   it('rejects fabricated transcript quotes and unknown claim citations', () => {
     expect(() =>
       validateExtraction(
@@ -282,6 +336,225 @@ describe('reasoning evidence boundaries', () => {
 });
 
 describe('durable human decision workflow', () => {
+  it.each([false, true])(
+    'keeps a confirmed stakeholder question correlated during re-review (provider failure=%s)',
+    async (providerFailure) => {
+      const h = harness();
+      const first = await h.workflow.ingestMeeting(meeting);
+      const target = { actorId: 'noor', displayName: 'Noor', role: 'Support' };
+      const confirmed = await h.workflow.confirmFollowUp(
+        meeting.workspaceId,
+        first.decisionId,
+        first.revision,
+        meeting.owner,
+        target,
+      );
+      if (providerFailure)
+        vi.spyOn(h.model, 'generate').mockRejectedValueOnce(
+          new Error('temporary model outage'),
+        );
+      const challenged = await h.workflow.challengeDecision(
+        meeting.workspaceId,
+        first.decisionId,
+        confirmed.revision,
+      );
+      expect(challenged.state).toBe(providerFailure ? 'FAILED' : 'NEEDS_INPUT');
+      expect(
+        challenged.followUps.filter((f) => f.status !== 'ANSWERED'),
+      ).toEqual([confirmed.followUps[0]]);
+      const resumed = await h.workflow.resumeWithEvidence(
+        meeting.workspaceId,
+        first.decisionId,
+        confirmed.followUps[0]!.questionId,
+        {
+          actor: target,
+          text: 'Two agents can cover this pilot.',
+          receivedAt: '2026-09-12T08:10:00.000Z',
+          sourceId: 'reply-after-review',
+        },
+      );
+      expect(resumed.state).toBe('READY_FOR_REVIEW');
+      expect(resumed.failure).toBeNull();
+      expect(
+        resumed.followUps.filter((f) => f.status === 'ANSWERED'),
+      ).toHaveLength(1);
+    },
+  );
+  it('keeps approval saved through an indexing outage and retries searchable context idempotently', async () => {
+    const h = harness();
+    vi.spyOn(h.model, 'generate')
+      .mockResolvedValueOnce(extraction)
+      .mockResolvedValueOnce(review(true))
+      .mockResolvedValueOnce(review(true));
+    const ready = await h.workflow.ingestMeeting(meeting);
+    expect(ready.state).toBe('READY_FOR_REVIEW');
+    await expect(h.workflow.indexApprovedDecision(ready)).rejects.toThrow(
+      'saved approval',
+    );
+    const ingest = vi
+      .mocked(h.sourceStore.ingestSource)
+      .mockRejectedValue(new Error('embedding outage'));
+    const approved = await h.workflow.approveDecision(
+      meeting.workspaceId,
+      ready.decisionId,
+      ready.revision,
+      meeting.owner,
+      'pilot',
+    );
+    expect(approved.state).toBe('APPROVED');
+    expect(await h.workflow.get(meeting.workspaceId, ready.decisionId)).toEqual(
+      approved,
+    );
+    await expect(h.workflow.indexApprovedDecision(approved)).rejects.toThrow(
+      'embedding outage',
+    );
+    let indexed: Source | null = null;
+    ingest.mockImplementation(async (source) => {
+      indexed = structuredClone(source);
+    });
+    vi.mocked(h.sourceStore.getSource).mockImplementation(async () => indexed);
+    const eventCount = h.store.events.length;
+    await h.workflow.indexApprovedDecision(approved);
+    expect(indexed).toMatchObject({
+      sourceType: 'DECISION',
+      revision: approved.revision,
+      metrics: [],
+      owner: meeting.owner,
+    });
+    expect(indexed!.content).toContain('does not verify underlying claims');
+    const writes = ingest.mock.calls.length;
+    await h.workflow.indexApprovedDecision(approved);
+    await h.workflow.approveDecision(
+      meeting.workspaceId,
+      approved.decisionId,
+      ready.revision,
+      meeting.owner,
+      'pilot',
+    );
+    expect(ingest).toHaveBeenCalledTimes(writes);
+    expect(h.store.events).toHaveLength(eventCount);
+  });
+  it('preserves unknown-speaker priorities as exact sourced shared criteria without inventing weights', async () => {
+    const h = harness();
+    const unknown = structuredClone(meeting);
+    unknown.segments[0]!.speaker = null;
+    unknown.segments[0]!.speakerLabel = 'Speaker 1';
+    const result = await h.workflow.ingestMeeting(unknown);
+    expect(result.state).toBe('NEEDS_INPUT');
+    expect(result.priorities).toEqual([
+      expect.objectContaining({
+        actor: null,
+        weight: null,
+        weightConfirmed: false,
+      }),
+    ]);
+    expect(result.analysis?.criteria).toEqual([
+      expect.objectContaining({
+        id: 'criterion-1',
+        speakerLabel: 'Speaker 1',
+        quote: extraction.priorities[0]!.quote,
+        kind: 'CONSTRAINT',
+      }),
+    ]);
+    expect(result.analysis?.review?.criterionAssessments).toHaveLength(2);
+  });
+  it('keeps an attributed reply citable even when RAG does not return it and explains changed recommendation conditions', async () => {
+    const h = harness();
+    const generated = vi.spyOn(h.model, 'generate');
+    const first = await h.workflow.ingestMeeting(meeting);
+    const target = { actorId: 'noor', displayName: 'Noor', role: 'Support' };
+    const confirmed = await h.workflow.confirmFollowUp(
+      meeting.workspaceId,
+      first.decisionId,
+      first.revision,
+      meeting.owner,
+      target,
+    );
+    const answer = {
+      actor: target,
+      text: 'Two agents can cover the pilot; this is my current estimate.',
+      receivedAt: '2026-09-12T08:10:00.000Z',
+      sourceId: 'not-found-by-similarity',
+    };
+    const ready = await h.workflow.resumeWithEvidence(
+      meeting.workspaceId,
+      first.decisionId,
+      confirmed.followUps[0]!.questionId,
+      answer,
+    );
+    expect(ready.state).toBe('READY_FOR_REVIEW');
+    const cited = ready.evidence.find((e) => e.sourceId === answer.sourceId);
+    expect(cited).toMatchObject({
+      excerpt: answer.text,
+      sourceType: 'FOLLOW_UP',
+      sourceDate: answer.receivedAt,
+      owner: target,
+      metrics: [],
+      relevance: { method: 'DIRECT' },
+    });
+    const modelInput = generated.mock.calls.findLast(
+      (call) => call[0] === 'red_team_review',
+    )?.[3] as { evidence: Evidence[] };
+    expect(modelInput.evidence).toContainEqual(cited);
+    const changed = ready.findings.find((f) => f.kind === 'CHANGE');
+    expect(changed?.text).toContain(
+      'Added condition: Coverage confirmed by participant; verify before rollout.',
+    );
+    expect(changed?.evidenceIds).toContain(cited?.evidenceId);
+    expect(ready.sourceIds).toContain(answer.sourceId);
+    await expect(
+      h.workflow.approveDecision(
+        meeting.workspaceId,
+        ready.decisionId,
+        ready.revision,
+        meeting.owner,
+        'broad',
+      ),
+    ).rejects.toThrow('reviewed action plan');
+    expect(
+      (await h.workflow.get(meeting.workspaceId, ready.decisionId)).state,
+    ).toBe('READY_FOR_REVIEW');
+  });
+  it('re-extracts the latest stored transcript after a correction is saved but review startup is interrupted', async () => {
+    const h = harness();
+    const first = await h.workflow.ingestMeeting(meeting);
+    const append = vi
+      .spyOn(h.store, 'appendDecisionEvent')
+      .mockRejectedValueOnce(new Error('interrupted review startup'));
+    await expect(
+      h.workflow.correctMeeting(
+        meeting.workspaceId,
+        first.decisionId,
+        first.revision,
+        meeting.owner,
+        {
+          segmentId: 'launch-segment-2',
+          speaker: null,
+          text: 'The QA report still has unresolved blockers.',
+        },
+      ),
+    ).rejects.toThrow('interrupted');
+    append.mockRestore();
+    const amended = structuredClone(extraction);
+    amended.claims[0]!.text = 'The QA report has unresolved blockers';
+    amended.claims[0]!.references = [
+      { segmentId: 'launch-segment-2', quote: 'unresolved blockers' },
+    ];
+    const generate = vi
+      .spyOn(h.model, 'generate')
+      .mockResolvedValueOnce(amended);
+    const retried = await h.workflow.challengeDecision(
+      meeting.workspaceId,
+      first.decisionId,
+      first.revision,
+    );
+    expect(generate.mock.calls[0]?.[0]).toBe('decision_extraction');
+    expect(retried.state).toBe('NEEDS_INPUT');
+    expect(retried.analysis?.meetingRevision).toBe(1);
+    expect(retried.claims[0]?.text).toBe(
+      'The QA report has unresolved blockers',
+    );
+  });
   it.each([false, true])(
     'resumes an interrupted attributed reply (clarification=%s)',
     async (clarification) => {

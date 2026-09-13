@@ -11,11 +11,18 @@ import {
   type Meeting,
   type Source,
 } from '../contracts/index.js';
-import type { DecisionStore, SourceStore } from '../contracts/services.js';
+import type {
+  DecisionStore,
+  DecisionWorkflow,
+  SourceStore,
+} from '../contracts/services.js';
 import { DecisionQueue } from '../data/queue.js';
+import { approvedDecisionSource } from '../data/approved-decision.js';
 import type { DecisionEngine } from './engine.js';
+import type { Review } from './schema.js';
 
 const queue = new DecisionQueue();
+const contextQueue = new DecisionQueue();
 export function stableId(...parts: string[]): string {
   return createHash('sha256')
     .update(JSON.stringify(parts))
@@ -23,7 +30,7 @@ export function stableId(...parts: string[]): string {
     .slice(0, 32);
 }
 export class WorkflowError extends Error {}
-export class DurableDecisionWorkflow {
+export class DurableDecisionWorkflow implements DecisionWorkflow {
   constructor(
     readonly store: DecisionStore,
     private readonly sources: SourceStore,
@@ -78,6 +85,9 @@ export class DurableDecisionWorkflow {
         'Only the configured decision owner can perform this action.',
       );
   }
+  analyzeDecision(meeting: Meeting): Promise<Decision> {
+    return this.ingestMeeting(meeting);
+  }
   async ingestMeeting(input: Meeting): Promise<Decision> {
     const meeting = MeetingSchema.parse(input);
     return queue.run(meeting.workspaceId, meeting.meetingId, async () => {
@@ -90,7 +100,12 @@ export class DurableDecisionWorkflow {
         !['RECEIVED', 'ANALYZING', 'FAILED'].includes(existing.state)
       )
         return existing;
-      await this.store.ingestMeeting(meeting);
+      const stored = existing
+        ? await this.store.getMeeting(meeting.workspaceId, meeting.meetingId)
+        : null;
+      const context =
+        stored && stored.revision >= meeting.revision ? stored : meeting;
+      await this.store.ingestMeeting(context);
       const initial =
         existing ??
         (await this.record(
@@ -122,7 +137,7 @@ export class DurableDecisionWorkflow {
           'RECEIVED',
           'received',
         ));
-      return this.review(initial, meeting, `initial:${initial.revision}`);
+      return this.review(initial, context, `initial:${initial.revision}`);
     });
   }
   private async review(
@@ -157,23 +172,31 @@ export class DurableDecisionWorkflow {
         sourceIds: [] as string[],
       };
       const { extraction, review } = analysis;
+      // A sent question is already an external promise to a specific person.
+      // Re-review must preserve its ID so the eventual reply still correlates.
+      const pendingConfirmed = started.followUps.find(
+        (f) => f.status === 'CONFIRMED',
+      );
       const question =
+        pendingConfirmed?.question ??
         review?.question?.text ??
         (!extraction.question ? extraction.clarification : null);
-      const nextQuestion = question
-        ? {
-            ...fields,
-            questionId: stableId(
-              current.decisionId,
-              String(revision),
-              question,
-            ),
-            question: `${review?.question?.role ? `[${review.question.role}] ` : ''}${question}`,
-            target: null,
-            status: 'PROPOSED' as const,
-            answer: null,
-          }
-        : null;
+      const nextQuestion =
+        pendingConfirmed ??
+        (question
+          ? {
+              ...fields,
+              questionId: stableId(
+                current.decisionId,
+                String(revision),
+                question,
+              ),
+              question: `${review?.question?.role ? `[${review.question.role}] ` : ''}${question}`,
+              target: null,
+              status: 'PROPOSED' as const,
+              answer: null,
+            }
+          : null);
       const completed = DecisionSchema.parse({
         ...started,
         revision,
@@ -204,19 +227,14 @@ export class DurableDecisionWorkflow {
             explanation: checked?.explanation ?? 'Evidence not checked.',
           };
         }),
-        priorities: extraction.priorities
-          .filter(
-            (p) =>
-              meeting.segments.find((s) => s.segmentId === p.segmentId)
-                ?.speaker,
-          )
-          .map((p) => ({
-            actor: meeting.segments.find((s) => s.segmentId === p.segmentId)
-              ?.speaker,
-            description: `${p.kind}${p.inferred ? ' (inferred)' : ''}: ${p.description}`,
-            weight: null,
-            weightConfirmed: false,
-          })),
+        priorities: extraction.priorities.map((p) => ({
+          actor:
+            meeting.segments.find((s) => s.segmentId === p.segmentId)
+              ?.speaker ?? null,
+          description: `${p.kind}${p.inferred ? ' (inferred)' : ''}: ${p.description}`,
+          weight: null,
+          weightConfirmed: false,
+        })),
         findings: review
           ? [
               {
@@ -232,8 +250,10 @@ export class DurableDecisionWorkflow {
                     {
                       findingId: 'changed',
                       kind: 'CHANGE',
-                      text: this.changes(current, review.checks),
-                      evidenceIds: [],
+                      text: this.changes(current, review),
+                      evidenceIds: evidence
+                        .filter((e) => e.sourceType === 'FOLLOW_UP')
+                        .map((e) => e.evidenceId),
                     },
                   ]
                 : []),
@@ -297,22 +317,39 @@ export class DurableDecisionWorkflow {
       );
     }
   }
-  private changes(
-    previous: Decision,
-    checks: { claimId: string; status: string; explanation: string }[],
-  ): string {
-    const changed = checks.filter((c) => {
+  private changes(previous: Decision, next: Review): string {
+    const changed = next.checks.filter((c) => {
       const old = previous.claims.find((x) => x.claimId === c.claimId);
       return old?.status !== c.status || old?.explanation !== c.explanation;
     });
-    return changed.length
+    const claimChanges = changed.length
       ? changed
           .map(
             (c) =>
               `${c.claimId}: ${previous.claims.find((x) => x.claimId === c.claimId)?.status ?? 'unchecked'} → ${c.status}. ${c.explanation}`,
           )
           .join('\n')
-      : 'No claim status or explanation changed. Inspect the updated recommendation conditions.';
+      : 'No claim status or explanation changed.';
+    const prior = previous.analysis?.review?.recommendation;
+    const label = (id: string | null | undefined) =>
+      previous.options.find((o) => o.optionId === id)?.title ?? id ?? 'None';
+    const recommendation =
+      prior?.optionId === next.recommendation.optionId
+        ? `Recommendation remains ${label(next.recommendation.optionId)}.`
+        : `Recommendation changed from ${label(prior?.optionId)} to ${label(next.recommendation.optionId)}.`;
+    const added = next.recommendation.conditions.filter(
+      (c) => !prior?.conditions.includes(c),
+    );
+    const removed =
+      prior?.conditions.filter(
+        (c) => !next.recommendation.conditions.includes(c),
+      ) ?? [];
+    return [
+      claimChanges,
+      recommendation,
+      ...added.map((c) => `Added condition: ${c}`),
+      ...removed.map((c) => `Replaced condition: ${c}`),
+    ].join('\n');
   }
   async challengeDecision(
     workspace: string,
@@ -372,6 +409,16 @@ export class DurableDecisionWorkflow {
       const question = current.followUps.find(
         (f) => f.questionId === questionId,
       );
+      if (
+        current.followUps.some(
+          (f) =>
+            f.questionId !== questionId &&
+            f.answer?.sourceId === answer.sourceId,
+        )
+      )
+        throw new WorkflowError(
+          'A reply ID is already attached to a different question.',
+        );
       if (question?.answer?.sourceId === answer.sourceId) {
         if (
           question.answer.text !== answer.text ||
@@ -400,7 +447,7 @@ export class DurableDecisionWorkflow {
         return current;
       }
       if (
-        current.state !== 'NEEDS_INPUT' ||
+        !['NEEDS_INPUT', 'ANALYZING', 'FAILED'].includes(current.state) ||
         question?.status !== 'CONFIRMED' ||
         question.target?.actorId !== answer.actor.actorId
       )
@@ -433,6 +480,9 @@ export class DurableDecisionWorkflow {
         {
           ...current,
           revision: current.revision + 1,
+          sourceIds: [...new Set([...current.sourceIds, answer.sourceId])],
+          state: 'NEEDS_INPUT',
+          failure: null,
           followUps: current.followUps.map((f) =>
             f.questionId === questionId
               ? { ...f, status: 'ANSWERED', answer }
@@ -506,8 +556,10 @@ export class DurableDecisionWorkflow {
         current.state === 'APPROVED' &&
         current.approval?.approvedRevision === revision &&
         current.approval.optionId === optionId
-      )
+      ) {
+        await this.indexApprovedDecision(current).catch(() => undefined);
         return current;
+      }
       this.check(current, revision);
       if (
         current.state !== 'READY_FOR_REVIEW' ||
@@ -516,7 +568,11 @@ export class DurableDecisionWorkflow {
         throw new WorkflowError(
           'Review must be ready and an existing option selected before approval.',
         );
-      return this.record(
+      if (current.recommendedOptionId !== optionId)
+        throw new WorkflowError(
+          'Only the recommended option has a reviewed action plan. Request changes and review the alternative before approving it.',
+        );
+      const approved = await this.record(
         {
           ...current,
           revision: revision + 1,
@@ -533,6 +589,43 @@ export class DurableDecisionWorkflow {
         `approve:${revision}`,
         actor,
       );
+      // Approval is the durable fact. Context indexing is a retryable side
+      // effect; a provider outage must not turn saved approval into failure.
+      await this.indexApprovedDecision(approved).catch(() => undefined);
+      return approved;
+    });
+  }
+
+  async indexApprovedDecision(input: Decision): Promise<void> {
+    await contextQueue.run(input.workspaceId, input.decisionId, async () => {
+      const saved = await this.get(input.workspaceId, input.decisionId);
+      if (saved.state !== 'APPROVED' || saved.revision !== input.revision)
+        throw new WorkflowError(
+          'Only the current saved approval can be indexed as organizational context.',
+        );
+      const meeting = await this.store.getMeeting(
+        saved.workspaceId,
+        saved.meetingId,
+      );
+      if (!meeting)
+        throw new WorkflowError(
+          'Stored transcript unavailable for context indexing.',
+        );
+      const source = approvedDecisionSource(saved, meeting);
+      const existing = await this.sources.getSource(
+        source.workspaceId,
+        source.projectId,
+        source.sourceId,
+        this.now(),
+      );
+      if (existing && existing.revision >= source.revision) {
+        if (JSON.stringify(existing) !== JSON.stringify(source))
+          throw new WorkflowError(
+            'The saved context source conflicts with this approval.',
+          );
+        return;
+      }
+      await this.sources.ingestSource(source);
     });
   }
 

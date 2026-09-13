@@ -68,6 +68,15 @@ export class RoomSessions {
     if (!r) throw new WorkflowError('Room session unavailable.');
     return r;
   }
+  async snapshot(id: string) {
+    const room = await this.get(id);
+    return {
+      ...room,
+      decision: room.decisionId
+        ? await this.workflow.get(this.workspace, room.decisionId)
+        : null,
+    };
+  }
   async append(id: string, input: unknown) {
     return this.queue.run(this.workspace, id, async () => {
       const r = await this.get(id);
@@ -123,12 +132,18 @@ export class RoomSessions {
         throw new WorkflowError(
           'Capture or paste a finalized transcript first.',
         );
-      if (r.lastReviewedCount === r.segments.length)
+      const previous =
+        r.lastReviewedCount === r.segments.length && r.decisionId
+          ? await this.workflow.get(this.workspace, r.decisionId)
+          : null;
+      if (
+        previous &&
+        (previous.state === 'APPROVED' ||
+          started - r.lastReviewAt < ROOM_REVIEW_INTERVAL_MS)
+      )
         return {
           room: r,
-          decision: r.decisionId
-            ? await this.workflow.get(this.workspace, r.decisionId)
-            : null,
+          decision: previous,
           elapsedMs: 0,
           suppressed: true,
           retryAfterMs: 0,
@@ -168,11 +183,20 @@ export class RoomSessions {
           text: s.text,
         })),
       });
-      const decision = await this.workflow.ingestMeeting(meeting);
+      // A manual review after the cooldown must see newly published evidence,
+      // even when nobody has added another transcript segment.
+      const decision = previous
+        ? await this.workflow.challengeDecision(
+            this.workspace,
+            previous.decisionId,
+            previous.revision,
+          )
+        : await this.workflow.ingestMeeting(meeting);
       const signature = stableId(
         JSON.stringify(
           decision.claims
             .map((c) => [
+              c.text,
               c.status,
               c.evidenceIds
                 .map((id) => {
@@ -186,6 +210,9 @@ export class RoomSessions {
         decision.options
           .find((o) => o.optionId === decision.recommendedOptionId)
           ?.title.toLowerCase() ?? 'none',
+        JSON.stringify(
+          decision.analysis?.review?.recommendation.conditions ?? [],
+        ),
       );
       const suppressed =
         r.muted ||

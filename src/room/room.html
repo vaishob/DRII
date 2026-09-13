@@ -397,6 +397,7 @@
       async function ensureRoom() {
         if (!room || !room.active) {
           room = await api('start');
+          clearReview();
           render();
         }
         return room;
@@ -542,6 +543,48 @@
         $('stop').disabled = true;
         setStatus('Microphone off · capture stopped');
       }
+      function clearReview() {
+        $('error').textContent = '';
+        $('result').textContent = 'Ready for a new discussion.';
+        $('sources').textContent = '';
+        $('evidence').hidden = true;
+        $('decision').textContent = '';
+        $('latency').textContent = '—';
+      }
+      function renderDecision(d, suppressed = false) {
+        const parts = [
+          d.title,
+          d.summary,
+          ...d.claims.map(
+            (c) => c.status + ': ' + c.text + '\n' + c.explanation,
+          ),
+          ...d.findings.map((f) => f.text),
+          'Conditions: ' +
+            (d.analysis?.review?.recommendation.conditions.join('; ') ||
+              'Need clarification'),
+          'State: ' + d.state + ' · no approval from this page',
+        ];
+        $('result').textContent = parts.join('\n\n');
+        $('result').classList.remove('empty');
+        $('sources').textContent = d.evidence
+          .map(
+            (e) =>
+              (e.synthetic ? '[SYNTHETIC] ' : '') +
+              e.sourceTitle +
+              ' · ' +
+              e.sourceDate +
+              '\n' +
+              e.excerpt +
+              '\n' +
+              e.sourceUrl,
+          )
+          .join('\n\n');
+        $('evidence').hidden = !d.evidence.length;
+        $('decision').textContent =
+          'To continue in your configured Slack channel: @DRII open ' +
+          d.decisionId +
+          (suppressed ? ' · unchanged, muted, or dismissed suggestion' : '');
+      }
       async function review(automatic = false, finalizedAt = null) {
         if (reviewing || !room || !room.segments.length) return;
         reviewing = true;
@@ -574,40 +617,7 @@
           if (!result.decision) return;
           const d = result.decision;
           if (result.suppressed && automatic) return;
-          const parts = [
-            d.title,
-            d.summary,
-            ...d.claims.map(
-              (c) => c.status + ': ' + c.text + '\n' + c.explanation,
-            ),
-            ...d.findings.map((f) => f.text),
-            'Conditions: ' +
-              (d.analysis?.review?.recommendation.conditions.join('; ') ||
-                'Need clarification'),
-            'State: ' + d.state + ' · no approval from this page',
-          ];
-          $('result').textContent = parts.join('\n\n');
-          $('result').classList.remove('empty');
-          $('sources').textContent = d.evidence
-            .map(
-              (e) =>
-                (e.synthetic ? '[SYNTHETIC] ' : '') +
-                e.sourceTitle +
-                ' · ' +
-                e.sourceDate +
-                '\n' +
-                e.excerpt +
-                '\n' +
-                e.sourceUrl,
-            )
-            .join('\n\n');
-          $('evidence').hidden = !d.evidence.length;
-          $('decision').textContent =
-            'To continue in your configured Slack channel: @DRII open ' +
-            d.decisionId +
-            (result.suppressed
-              ? ' · unchanged, muted, or dismissed suggestion'
-              : '');
+          renderDecision(d, result.suppressed);
           setStatus(
             capturing
               ? 'Capturing · review ready'
@@ -662,7 +672,7 @@
           room = await api('start');
           lastTextEnd = 0;
           render();
-          $('result').textContent = 'Ready for a new discussion.';
+          clearReview();
           setStatus('New session · microphone off');
         } catch (e) {
           error(e);
@@ -728,12 +738,24 @@
       if (saved)
         api('status', { id: saved })
           .then((r) => {
-            room = r;
+            const { decision, ...snapshot } = r;
+            room = snapshot;
             lastTextEnd = r.segments.at(-1)?.endMs || 0;
             render();
+            if (decision)
+              renderDecision(
+                decision,
+                r.muted || r.dismissed.includes(r.lastSignature),
+              );
             setStatus('Session restored · microphone off');
           })
-          .catch(() => localStorage.removeItem('drii-room'));
+          .catch(() =>
+            error(
+              new Error(
+                'Saved session could not load. Refresh to retry, or explicitly start a new session.',
+              ),
+            ),
+          );
     </script>
   </body>
 </html>

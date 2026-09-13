@@ -23,6 +23,8 @@ import {
   WorkflowError,
 } from '../intelligence/workflow.js';
 import { RoomSessions } from './session.js';
+import { RuntimeResources } from '../runtime.js';
+import { SHUTDOWN_TIMEOUT_MS } from '../config/limits.js';
 
 export const ROOM_PORT = 3180;
 export const MAX_ROOM_BODY = 2_000_000;
@@ -91,7 +93,7 @@ export function createRoomServer(
       }
       if (!body.id) throw new WorkflowError('Room ID required.');
       if (req.url === '/api/status')
-        send(res, 200, await sessions.get(body.id));
+        send(res, 200, await sessions.snapshot(body.id));
       else if (req.url === '/api/segment')
         send(
           res,
@@ -162,41 +164,75 @@ async function main() {
   if (!config.OPENAI_API_KEY || !config.DRII_DECISION_OWNER_ID)
     throw new Error('Set OPENAI_API_KEY and DRII_DECISION_OWNER_ID.');
   const db = createDatabase(config);
-  await setupSchema(db);
-  const embedder = new OpenAIEmbedder(config);
-  const sources = new ClickHouseSourceStore(db, embedder);
-  const workflow = new DurableDecisionWorkflow(
-    new ClickHouseDecisionStore(db),
-    sources,
-    new DecisionEngine(
-      new OpenAIReasoningModel(config),
-      new ClickHouseEvidenceRetriever(db, embedder, config.DRII_MIN_RELEVANCE),
-    ),
-  );
-  const sessions = new RoomSessions(
-    new ClickHouseRecords(db),
-    workflow,
-    config.DRII_DEMO_WORKSPACE_ID,
-    config.DRII_DEMO_PROJECT_ID,
-    {
-      actorId: config.DRII_DECISION_OWNER_ID,
-      displayName: config.DRII_DECISION_OWNER_ID,
-      role: 'Configured owner',
-    },
-  );
-  const server = await configuredRoomServer(sessions, config);
-  server.listen(ROOM_PORT, '127.0.0.1', () =>
+  const resources = new RuntimeResources();
+  resources.defer(() => db.close());
+  try {
+    await resources.stage('ClickHouse schema setup', () => setupSchema(db));
+    const embedder = new OpenAIEmbedder(config);
+    const sources = new ClickHouseSourceStore(db, embedder);
+    const workflow = new DurableDecisionWorkflow(
+      new ClickHouseDecisionStore(db),
+      sources,
+      new DecisionEngine(
+        new OpenAIReasoningModel(config),
+        new ClickHouseEvidenceRetriever(
+          db,
+          embedder,
+          config.DRII_MIN_RELEVANCE,
+        ),
+      ),
+    );
+    const sessions = new RoomSessions(
+      new ClickHouseRecords(db),
+      workflow,
+      config.DRII_DEMO_WORKSPACE_ID,
+      config.DRII_DEMO_PROJECT_ID,
+      {
+        actorId: config.DRII_DECISION_OWNER_ID,
+        displayName: config.DRII_DECISION_OWNER_ID,
+        role: 'Configured owner',
+      },
+    );
+    const server = await configuredRoomServer(sessions, config);
+    resources.defer(
+      () =>
+        new Promise<void>((resolve) => {
+          server.close(() => resolve());
+        }),
+    );
+    await resources.stage(
+      'room listener',
+      () =>
+        new Promise<void>((resolve, reject) => {
+          server.once('error', reject);
+          server.listen(ROOM_PORT, '127.0.0.1', () => {
+            server.removeListener('error', reject);
+            resolve();
+          });
+        }),
+    );
     process.stdout.write(
       `Room capture ready at http://127.0.0.1:${ROOM_PORT}. Start capture explicitly in the page.\n`,
-    ),
-  );
-  const stop = () => {
-    server.close(() => {
-      void db.close();
-    });
-  };
-  process.once('SIGINT', stop);
-  process.once('SIGTERM', stop);
+    );
+    const stop = () => {
+      const deadline = setTimeout(() => process.exit(1), SHUTDOWN_TIMEOUT_MS);
+      deadline.unref();
+      void resources.close().catch(() => {
+        process.exitCode = 1;
+      });
+    };
+    process.once('SIGINT', stop);
+    process.once('SIGTERM', stop);
+  } catch (error) {
+    const deadline = setTimeout(() => process.exit(1), SHUTDOWN_TIMEOUT_MS);
+    deadline.unref();
+    try {
+      await resources.close();
+    } catch {
+      /* Preserve sanitized startup failure. */
+    }
+    throw error;
+  }
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1])
   void main().catch(() => {

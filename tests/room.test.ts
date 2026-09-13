@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { RoomSessions } from '../src/room/session.js';
 import { createRoomServer } from '../src/room/server.js';
 import { DurableDecisionWorkflow } from '../src/intelligence/workflow.js';
@@ -29,6 +29,7 @@ function setup() {
   );
   return {
     sessions,
+    sources,
     advance: () => {
       time += 60_000;
     },
@@ -70,6 +71,49 @@ it('deduplicates finalized segments, respects stop/mute, and limits repeated obj
   await expect(
     h.sessions.append(room.id, { ...segment, id: 's3' }),
   ).rejects.toThrow('stopped');
+});
+it('refreshes changed evidence after the cooldown without requiring more speech', async () => {
+  const h = setup();
+  const room = await h.sessions.create();
+  await h.sessions.append(room.id, {
+    id: 's1',
+    text: 'We must decide whether to launch. All blocking bugs are fixed.',
+    startMs: 0,
+    endMs: 1000,
+    finalized: true,
+  });
+  const first = await h.sessions.review(room.id);
+  expect(first.decision?.claims[0]?.status).toBe('CONTRADICTED');
+  const source = h.sources.sources.find(
+    (s) => s.sourceId === 'engineering-readiness',
+  )!;
+  h.sources.sources = h.sources.sources.map((s) =>
+    s.sourceId === source.sourceId
+      ? {
+          ...s,
+          revision: s.revision + 10,
+          content:
+            'All blocking bugs are fixed. There are zero open critical billing bugs.',
+        }
+      : s,
+  );
+  h.advance();
+  const refreshed = await h.sessions.review(room.id);
+  expect(refreshed.decision?.decisionId).toBe(first.decision?.decisionId);
+  expect(refreshed.decision!.revision).toBeGreaterThan(
+    first.decision!.revision,
+  );
+  expect(
+    refreshed.decision?.evidence.some(
+      (e) => e.sourceId === source.sourceId && e.sourceRevision >= 10,
+    ),
+  ).toBe(true);
+  expect(refreshed.suppressed).toBe(false);
+  const retrieve = vi.spyOn(h.sources, 'retrieveEvidence');
+  const restored = await h.sessions.snapshot(room.id);
+  expect(restored.decision).toEqual(refreshed.decision);
+  expect(restored.segments).toHaveLength(1);
+  expect(retrieve).not.toHaveBeenCalled();
 });
 it('requires loopback origin and a page token before accepting capture or transcription', async () => {
   const h = setup();

@@ -4,6 +4,60 @@ DRII turns fragmented organizational context into evidence-backed decisions. It 
 
 **Status:** the implementation now includes structured extraction, evidence checking, red-team review, durable Slack follow-up and owner approval, assumption monitoring, and an optional room interface. Use `DRII_ANALYSIS_MODE=live` with configured accounts. Offline tests and scripted evaluations are separate from the live ClickHouse/OpenAI/Slack acceptance gates, which still need real credentials and a teammate rehearsal. See the [current workflow runbook](docs/workflow.md) and [verification record](docs/verification.md).
 
+## Fast offline demo on Windows
+
+The offline demo needs no `.env`, API keys, Slack workspace, ClickHouse account, uploads, or paid calls. It uses clearly labeled scripted fixtures.
+
+### One-time installation
+
+Run this once after cloning the repository. Run it again only when `package-lock.json` changes or when you intentionally want a clean dependency installation.
+
+```powershell
+$nodeDir = Join-Path $PWD '.tools\node-v24.21.0-win-x64'
+$env:Path = "$nodeDir;$env:Path"
+
+& (Join-Path $nodeDir 'npm.cmd') ci
+```
+
+### At the start of each new PowerShell terminal
+
+Run this whenever you open a new PowerShell window. It makes the bundled Node.js 24 runtime available for that terminal only. The explicit `npm.cmd` invocation works when PowerShell blocks `npm.ps1` under the local execution policy.
+
+```powershell
+$nodeDir = Join-Path $PWD '.tools\node-v24.21.0-win-x64'
+$env:Path = "$nodeDir;$env:Path"
+```
+
+### Every room-demo presentation
+
+Run this immediately before the interactive room demo. It starts a local server, so keep that terminal open for the presentation.
+
+```powershell
+& (Join-Path $nodeDir 'npm.cmd') run demo:offline
+& (Join-Path $nodeDir 'npm.cmd') run demo:room
+```
+
+`demo:offline` is optional narration for the terminal: it prints the fixture Slack-card sequence. `demo:room` is the browser demonstration. Leave its terminal running and open `http://127.0.0.1:3180`. In the page, paste `We must decide whether to launch. All blocking bugs are fixed.`, click **Add finalized text**, then **Review current discussion**. Expand **Inspect exact evidence and provenance** to show the sourced objection. Refresh the page to demonstrate the saved transcript and review are restored without another model call. Stop the local server with `Ctrl+C` when the demo ends.
+
+### Before a rehearsal or handoff
+
+Run this when you want to prove the scripted cases still pass. It is not required for every spoken demo.
+
+```powershell
+& (Join-Path $nodeDir 'npm.cmd') run eval:offline
+```
+
+In **Command Prompt** rather than PowerShell, use this setup instead:
+
+```cmd
+set "nodeDir=%CD%\.tools\node-v24.21.0-win-x64"
+set "PATH=%nodeDir%;%PATH%"
+rem Run npm ci once after cloning or when package-lock.json changes.
+"%nodeDir%\npm.cmd" ci
+rem Run this each room-demo presentation; keep the terminal open.
+"%nodeDir%\npm.cmd" run demo:room
+```
+
 ## Run and verify
 
 Use Node.js 24 and install the locked dependencies with `npm ci`.

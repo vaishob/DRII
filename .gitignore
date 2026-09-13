@@ -1,5 +1,7 @@
 node_modules/
 dist/
+demo-dist/
+.vercel/
 coverage/
 .tools/
 .env
